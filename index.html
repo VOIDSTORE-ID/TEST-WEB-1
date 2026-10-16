@@ -1,34 +1,715 @@
-<!doctype html>
-<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VOID STORE — Demo Lokal</title>
-<style>
-:root{--gold:#ffca05;--bg:#050607;--card:#101317;--muted:#a9b0ba}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:#f5f5f5;font:16px/1.6 Arial,sans-serif}header,footer{padding:16px 6%;background:#08090b;border-bottom:1px solid #292929}header{display:flex;justify-content:space-between;align-items:center;gap:14px;position:sticky;top:0;z-index:3}.logo{color:var(--gold);font-size:24px;font-weight:900;letter-spacing:2px}nav{display:flex;flex-wrap:wrap;gap:10px}a{color:white;text-decoration:none}nav a:hover{color:var(--gold)}.hero{padding:60px 7%;background:radial-gradient(ellipse at right,#55400b,transparent 48%),linear-gradient(120deg,#08090b,#171717)}.tag{color:var(--gold);font-size:11px;letter-spacing:3px}.hero h1{font-size:clamp(40px,8vw,68px);line-height:1.1}.hero h1 span,.price,h3,.gold{color:var(--gold)}section{padding:40px 6%;scroll-margin-top:75px}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card,.product{background:var(--card);border:1px solid #30343a;border-radius:10px;overflow:hidden}.card{padding:18px}.btn{display:inline-block;background:var(--gold);color:#080808;font-weight:bold;border:0;border-radius:6px;padding:11px 15px;cursor:pointer}.secondary{background:#25282e;color:white}.catalog-controls{display:grid;grid-template-columns:2fr 1fr;gap:10px;max-width:680px;margin:18px 0}.catalog-controls label{font-size:12px;color:var(--muted)}input,select{width:100%;padding:11px;background:#080a0d;color:white;border:1px solid #41464d;border-radius:6px}.product{display:flex;flex-direction:column}.uc-art{height:100px;display:grid;place-items:center;background:radial-gradient(ellipse,#4a3908,#0c0e11 78%)}.uc-token{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#ffe889,#c58c12,#fff0a7);color:#342400;font-weight:1000}.product-body{padding:14px;display:flex;flex-direction:column;flex:1}.product h3{color:white;margin:3px 0}.price{font-weight:bold;margin:5px 0 12px}.product .btn{margin-top:auto}.message{background:#15191e;padding:10px;border-radius:6px;color:var(--muted)}.hidden{display:none!important}label{display:block;margin:12px 0 5px}.checkout{max-width:680px;margin:auto}.tabs{display:flex;gap:8px;margin:16px 0}.tabs button{background:#20242a;color:white;border:1px solid #444;padding:9px;border-radius:5px;cursor:pointer}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #333;padding:9px;text-align:left}footer{text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #292929}@media(max-width:650px){header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}section{padding:32px 5%}.catalog-controls{grid-template-columns:1fr}.hero{padding:42px 6%}}@media(max-width:420px){.grid{grid-template-columns:1fr}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.product-body{padding:9px}.product .btn{font-size:12px;padding:9px 5px}}
-</style></head><body>
-<header><div class="logo">VOID STORE</div><nav><a href="#beranda">Home</a><a href="#layanan">Layanan</a><a href="#produk">Produk</a><a href="#kontak">Kontak</a><a href="#admin">Admin Demo</a></nav></header>
-<main>
-<section class="hero" id="beranda"><div class="tag">YOUR TRUSTED PUBG MOBILE PARTNER</div><h1>VOID <span>STORE</span></h1><h3>TOP UP UC • SEWA AKUN • STOCK AKUN</h3><p class="muted">Demo lokal untuk menguji katalog, pencarian, urut harga, checkout, dan draft WhatsApp.</p><a class="btn" href="#produk">LIHAT PRODUK →</a><p class="muted">MODE DEMO — belum terhubung ke Firebase.</p></section>
-<section id="layanan"><div class="tag">LAYANAN KAMI</div><h2>PILIH LAYANAN KAMU</h2><div class="grid"><article class="card"><h3>🪙 TOP UP UC</h3><p class="muted">Pilih paket UC dan isi detail pemain.</p><a class="btn" href="#produk">Lihat Produk</a></article><article class="card"><h3>🎮 SEWA AKUN</h3><p class="muted">Tanyakan stok dan detail sewa kepada admin.</p><a class="btn" href="#kontak">Hubungi Admin</a></article><article class="card"><h3>👑 STOCK AKUN</h3><p class="muted">Konfirmasi ketersediaan akun melalui admin.</p><a class="btn" href="#kontak">Cek Stock</a></article></div></section>
-<section id="produk"><div class="tag">KATALOG TOKO / PUBG MOBILE</div><h2>KATALOG <span class="gold">UC</span></h2><p class="muted">Harga di bawah hanya contoh untuk pengujian. Ganti dengan harga resmi sebelum dipakai transaksi.</p><p id="catalogCount" class="muted"></p><div class="catalog-controls"><div><label for="catalogSearch">Cari paket UC</label><input id="catalogSearch" placeholder="Contoh: 325 UC"></div><div><label for="catalogSort">Urutkan</label><select id="catalogSort"><option value="default">Urutan katalog</option><option value="low">Harga terendah</option><option value="high">Harga tertinggi</option><option value="uc">Nominal UC</option></select></div></div><div id="products" class="grid product-grid"></div><p id="catalogMessage" class="message hidden">Paket tidak ditemukan.</p></section>
-<section id="order" class="hidden"><div class="tag">CHECKOUT DEMO</div><h2>DETAIL PESANAN</h2><form id="orderForm" class="checkout"><p id="selectedProduct" class="message"></p><label for="customerName">Nama pembeli</label><input id="customerName" required maxlength="80"><label for="nickname">Nickname PUBG</label><input id="nickname" required maxlength="80"><label for="playerId">Player ID (5–30 angka)</label><input id="playerId" required inputmode="numeric" pattern="[0-9]{5,30}" minlength="5" maxlength="30"><label for="phone">Nomor WhatsApp pembeli</label><input id="phone" required type="tel" maxlength="25"><label for="paymentMethod">Metode pembayaran (pilihan contoh)</label><select id="paymentMethod" required><option value="">Pilih metode</option><option>DANA</option><option>GoPay</option><option>OVO</option><option>Transfer Bank</option><option>Konfirmasi ke admin</option></select><p id="orderMessage" class="message">Belum ada pesanan.</p><button class="btn" type="submit">Buat Pesanan & WhatsApp</button> <button class="btn secondary" id="cancelOrder" type="button">Batal</button><p class="muted">Tidak ada pembayaran otomatis. Periksa chat WhatsApp sebelum mengirimnya.</p></form></section>
-<section id="kontak"><div class="tag">VOID STORE</div><h2>SIAP UNTUK ORDER?</h2><p class="muted">Hubungi admin untuk top up, sewa akun, atau stok akun.</p><a class="btn" id="whatsappLink" target="_blank" rel="noopener noreferrer">HUBUNGI VIA WHATSAPP</a></section>
-<section id="admin"><div class="tag">AREA ADMIN / DEMO</div><h2>Dashboard Admin Demo</h2><p class="message"><b class="gold">Perhatian:</b> Ini bukan login admin aman. Tidak ada password yang diperlukan. Data hanya tersimpan di browser lokal, bukan Firebase/server.</p><div class="tabs"><button data-tab="orders">Pesanan demo</button><button data-tab="products">Katalog</button></div><div id="tab-orders"><h3>Pesanan di browser ini</h3><div class="tablewrap"><table><thead><tr><th>Waktu</th><th>Pembeli / ID</th><th>Paket</th><th>Pembayaran</th><th>Status</th></tr></thead><tbody id="ordersBody"></tbody></table></div><button id="clearOrders" class="btn secondary" type="button">Reset data demo</button></div><div id="tab-products" class="hidden"><div class="tablewrap"><table><thead><tr><th>Produk</th><th>Harga contoh</th><th>Status</th></tr></thead><tbody id="productsBody"></tbody></table></div></div></section>
-</main><footer><b>VOID STORE</b><p>TOP UP • SEWA AKUN • STOCK AKUN</p><p>© 2026 VOID STORE — Demo lokal untuk Sublime Text.</p></footer>
-<script>
-"use strict";
-const ADMIN_WA="6285813172078";
-const packages=[["uc60","UC 60",60,15000],["uc120","UC 120",120,29000],["uc180","UC 180",180,43000],["uc240","UC 240",240,57000],["uc325","UC 325",325,76000],["uc385","UC 385",385,90000],["uc445","UC 445",445,104000],["uc505","UC 505",505,118000],["uc565","UC 565",565,132000],["uc660","UC 660",660,152000]].map(([id,name,uc,price])=>({id,name,uc,price}));
-const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(n), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let selected=null;
-function orders(){try{return JSON.parse(localStorage.getItem("voidstore_demo_orders")||"[]")}catch(e){return []}}
-function saveOrders(a){localStorage.setItem("voidstore_demo_orders",JSON.stringify(a))}
-function renderProducts(){let q=$("catalogSearch").value.trim().toLowerCase(),s=$("catalogSort").value,a=packages.filter(p=>p.name.toLowerCase().includes(q)||String(p.uc).includes(q)||String(p.price).includes(q));if(s==="low")a.sort((x,y)=>x.price-y.price);if(s==="high")a.sort((x,y)=>y.price-x.price);if(s==="uc")a.sort((x,y)=>x.uc-y.uc);$("catalogCount").textContent=`${a.length} dari ${packages.length} paket`; $("catalogMessage").classList.toggle("hidden",a.length>0);$("products").innerHTML=a.map(p=>`<article class="product"><div class="uc-art"><div class="uc-token">UC</div></div><div class="product-body"><span class="muted">PUBG MOBILE • DIGITAL</span><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}</div><button class="btn" data-buy="${p.id}">Pilih Paket</button></div></article>`).join("");$("products").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>choose(b.dataset.buy))}
-function choose(id){selected=packages.find(p=>p.id===id);$("selectedProduct").textContent=`Dipilih: ${selected.name} — ${money(selected.price)}`;$("order").classList.remove("hidden");location.hash="order";$("order").scrollIntoView({behavior:"smooth"})}
-function renderAdmin(){let a=orders();$("ordersBody").innerHTML=a.length?a.slice().reverse().map(o=>`<tr><td>${esc(o.time)}</td><td>${esc(o.name)}<br>${esc(o.playerId)}</td><td>${esc(o.product)}<br>${esc(o.price)}</td><td>${esc(o.payment)}</td><td>${esc(o.status)}</td></tr>`).join(""):'<tr><td colspan="5">Belum ada pesanan demo.</td></tr>';$("productsBody").innerHTML=packages.map(p=>`<tr><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>Aktif (demo)</td></tr>`).join("")}
-$("catalogSearch").oninput=renderProducts;$("catalogSort").onchange=renderProducts;
-$("orderForm").onsubmit=e=>{e.preventDefault();if(!selected)return;let name=$("customerName").value.trim(),nickname=$("nickname").value.trim(),playerId=$("playerId").value.trim(),phone=$("phone").value.trim(),payment=$("paymentMethod").value;if(!/^[0-9]{5,30}$/.test(playerId)){$("orderMessage").textContent="Player ID harus 5–30 digit angka.";return}let o={time:new Date().toLocaleString("id-ID"),name,nickname,playerId,phone,product:selected.name,price:money(selected.price),payment,status:"Menunggu konfirmasi admin"};let a=orders();a.push(o);saveOrders(a);renderAdmin();let text=`Halo Admin VOID STORE, saya ingin bertanya tentang pesanan (DEMO).\nPaket: ${selected.name}\nHarga contoh: ${money(selected.price)}\nNama: ${name}\nNickname PUBG: ${nickname}\nPlayer ID: ${playerId}\nWhatsApp pembeli: ${phone}\nMetode pembayaran: ${payment}\nMohon konfirmasi harga dan stok sebelum pembayaran.`;$("orderMessage").textContent="Pesanan tersimpan secara lokal. WhatsApp akan terbuka untuk diperiksa.";window.open("https://wa.me/"+ADMIN_WA+"?text="+encodeURIComponent(text),"_blank","noopener")};
-$("cancelOrder").onclick=()=>{selected=null;$("orderForm").reset();$("order").classList.add("hidden");location.hash="produk"};
-$("whatsappLink").href="https://wa.me/"+ADMIN_WA+"?text="+encodeURIComponent("Halo Admin VOID STORE, saya ingin bertanya tentang layanan PUBG Mobile.");
-$("clearOrders").onclick=()=>{if(confirm("Hapus seluruh pesanan demo lokal?")){saveOrders([]);renderAdmin()}};
-document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{let t=b.dataset.tab;$("tab-orders").classList.toggle("hidden",t!=="orders");$("tab-products").classList.toggle("hidden",t!=="products")});
-renderProducts();renderAdmin();
-</script></body></html>
+S<!doctype html>
+<html lang="id">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VOID STORE — Demo Lokal</title>
+
+  <style>
+    /* ===== Variabel & reset ===== */
+    :root {
+      --gold: #ffca05;
+      --bg: #050607;
+      --card: #101317;
+      --muted: #a9b0ba;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #f5f5f5;
+      font: 16px/1.6 Arial, sans-serif;
+    }
+
+    a {
+      color: white;
+      text-decoration: none;
+    }
+
+    /* ===== Header, navigasi & footer ===== */
+    header,
+    footer {
+      padding: 16px 6%;
+      background: #08090b;
+      border-bottom: 1px solid #292929;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    .logo {
+      color: var(--gold);
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    nav a:hover {
+      color: var(--gold);
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid #292929;
+    }
+
+    /* ===== Hero ===== */
+    .hero {
+      padding: 60px 7%;
+      background:
+        radial-gradient(ellipse at right, #55400b, transparent 48%),
+        linear-gradient(120deg, #08090b, #171717);
+    }
+
+    .tag {
+      color: var(--gold);
+      font-size: 11px;
+      letter-spacing: 3px;
+    }
+
+    .hero h1 {
+      font-size: clamp(40px, 8vw, 68px);
+      line-height: 1.1;
+    }
+
+    .hero h1 span,
+    .price,
+    h3,
+    .gold {
+      color: var(--gold);
+    }
+
+    /* ===== Section & grid ===== */
+    section {
+      padding: 40px 6%;
+      scroll-margin-top: 75px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card,
+    .product {
+      background: var(--card);
+      border: 1px solid #30343a;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .card {
+      padding: 18px;
+    }
+
+    /* ===== Tombol ===== */
+    .btn {
+      display: inline-block;
+      background: var(--gold);
+      color: #080808;
+      font-weight: bold;
+      border: 0;
+      border-radius: 6px;
+      padding: 11px 15px;
+      cursor: pointer;
+    }
+
+    .secondary {
+      background: #25282e;
+      color: white;
+    }
+
+    /* ===== Katalog ===== */
+    .catalog-controls {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 10px;
+      max-width: 680px;
+      margin: 18px 0;
+    }
+
+    .catalog-controls label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 11px;
+      background: #080a0d;
+      color: white;
+      border: 1px solid #41464d;
+      border-radius: 6px;
+    }
+
+    .product {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .uc-art {
+      height: 100px;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(ellipse, #4a3908, #0c0e11 78%);
+    }
+
+    .uc-token {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, #ffe889, #c58c12, #fff0a7);
+      color: #342400;
+      font-weight: 1000;
+    }
+
+    .product-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .product h3 {
+      color: white;
+      margin: 3px 0;
+    }
+
+    .price {
+      font-weight: bold;
+      margin: 5px 0 12px;
+    }
+
+    .product .btn {
+      margin-top: auto;
+    }
+
+    /* ===== Pesan, form & checkout ===== */
+    .message {
+      background: #15191e;
+      padding: 10px;
+      border-radius: 6px;
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 5px;
+    }
+
+    .checkout {
+      max-width: 680px;
+      margin: auto;
+    }
+
+    /* ===== Admin: tab & tabel ===== */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .tabs button {
+      background: #20242a;
+      color: white;
+      border: 1px solid #444;
+      padding: 9px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .tablewrap {
+      overflow: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    td,
+    th {
+      border-bottom: 1px solid #333;
+      padding: 9px;
+      text-align: left;
+    }
+
+    /* ===== Responsif ===== */
+    @media (max-width: 650px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      section {
+        padding: 32px 5%;
+      }
+
+      .catalog-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        padding: 42px 6%;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .product-body {
+        padding: 9px;
+      }
+
+      .product .btn {
+        font-size: 12px;
+        padding: 9px 5px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header>
+    <div class="logo">VOID STORE</div>
+    <nav>
+      <a href="#beranda">Home</a>
+      <a href="#layanan">Layanan</a>
+      <a href="#produk">Produk</a>
+      <a href="#kontak">Kontak</a>
+      <a href="#admin">Admin Demo</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero" id="beranda">
+      <div class="tag">YOUR TRUSTED PUBG MOBILE PARTNER</div>
+      <h1>VOID <span>STORE</span></h1>
+      <h3>TOP UP UC • SEWA AKUN • STOCK AKUN</h3>
+      <p class="muted">Demo lokal untuk menguji katalog, pencarian, urut harga, checkout, dan draft WhatsApp.</p>
+      <a class="btn" href="#produk">LIHAT PRODUK →</a>
+      <p class="muted">MODE DEMO — belum terhubung ke Firebase.</p>
+    </section>
+
+    <!-- ===== LAYANAN ===== -->
+    <section id="layanan">
+      <div class="tag">LAYANAN KAMI</div>
+      <h2>PILIH LAYANAN KAMU</h2>
+
+      <div class="grid">
+        <article class="card">
+          <h3>🪙 TOP UP UC</h3>
+          <p class="muted">Pilih paket UC dan isi detail pemain.</p>
+          <a class="btn" href="#produk">Lihat Produk</a>
+        </article>
+
+        <article class="card">
+          <h3>🎮 SEWA AKUN</h3>
+          <p class="muted">Tanyakan stok dan detail sewa kepada admin.</p>
+          <a class="btn" href="#kontak">Hubungi Admin</a>
+        </article>
+
+        <article class="card">
+          <h3>👑 STOCK AKUN</h3>
+          <p class="muted">Konfirmasi ketersediaan akun melalui admin.</p>
+          <a class="btn" href="#kontak">Cek Stock</a>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== KATALOG PRODUK ===== -->
+    <section id="produk">
+      <div class="tag">KATALOG TOKO / PUBG MOBILE</div>
+      <h2>KATALOG <span class="gold">UC</span></h2>
+      <p class="muted">Harga di bawah hanya contoh untuk pengujian. Ganti dengan harga resmi sebelum dipakai transaksi.</p>
+      <p id="catalogCount" class="muted"></p>
+
+      <div class="catalog-controls">
+        <div>
+          <label for="catalogSearch">Cari paket UC</label>
+          <input id="catalogSearch" placeholder="Contoh: 325 UC">
+        </div>
+        <div>
+          <label for="catalogSort">Urutkan</label>
+          <select id="catalogSort">
+            <option value="default">Urutan katalog</option>
+            <option value="low">Harga terendah</option>
+            <option value="high">Harga tertinggi</option>
+            <option value="uc">Nominal UC</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="products" class="grid product-grid"></div>
+      <p id="catalogMessage" class="message hidden">Paket tidak ditemukan.</p>
+    </section>
+
+    <!-- ===== CHECKOUT ===== -->
+    <section id="order" class="hidden">
+      <div class="tag">CHECKOUT DEMO</div>
+      <h2>DETAIL PESANAN</h2>
+
+      <form id="orderForm" class="checkout">
+        <p id="selectedProduct" class="message"></p>
+
+        <label for="customerName">Nama pembeli</label>
+        <input id="customerName" required maxlength="80">
+
+        <label for="nickname">Nickname PUBG</label>
+        <input id="nickname" required maxlength="80">
+
+        <label for="playerId">Player ID (5–30 angka)</label>
+        <input id="playerId" required inputmode="numeric" pattern="[0-9]{5,30}" minlength="5" maxlength="30">
+
+        <label for="phone">Nomor WhatsApp pembeli</label>
+        <input id="phone" required type="tel" maxlength="25">
+
+        <label for="paymentMethod">Metode pembayaran (pilihan contoh)</label>
+        <select id="paymentMethod" required>
+          <option value="">Pilih metode</option>
+          <option>DANA</option>
+          <option>GoPay</option>
+          <option>OVO</option>
+          <option>Transfer Bank</option>
+          <option>Konfirmasi ke admin</option>
+        </select>
+
+        <p id="orderMessage" class="message">Belum ada pesanan.</p>
+
+        <button class="btn" type="submit">Buat Pesanan &amp; WhatsApp</button>
+        <button class="btn secondary" id="cancelOrder" type="button">Batal</button>
+
+        <p class="muted">Tidak ada pembayaran otomatis. Periksa chat WhatsApp sebelum mengirimnya.</p>
+      </form>
+    </section>
+
+    <!-- ===== KONTAK ===== -->
+    <section id="kontak">
+      <div class="tag">VOID STORE</div>
+      <h2>SIAP UNTUK ORDER?</h2>
+      <p class="muted">Hubungi admin untuk top up, sewa akun, atau stok akun.</p>
+      <a class="btn" id="whatsappLink" target="_blank" rel="noopener noreferrer">HUBUNGI VIA WHATSAPP</a>
+    </section>
+
+    <!-- ===== ADMIN DEMO ===== -->
+    <section id="admin">
+      <div class="tag">AREA ADMIN / DEMO</div>
+      <h2>Dashboard Admin Demo</h2>
+
+      <p class="message">
+        <b class="gold">Perhatian:</b>
+        Ini bukan login admin aman. Tidak ada password yang diperlukan.
+        Data hanya tersimpan di browser lokal, bukan Firebase/server.
+      </p>
+
+      <div class="tabs">
+        <button data-tab="orders">Pesanan demo</button>
+        <button data-tab="products">Katalog</button>
+      </div>
+
+      <!-- Tab: pesanan -->
+      <div id="tab-orders">
+        <h3>Pesanan di browser ini</h3>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Pembeli / ID</th>
+                <th>Paket</th>
+                <th>Pembayaran</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+          </table>
+        </div>
+        <button id="clearOrders" class="btn secondary" type="button">Reset data demo</button>
+      </div>
+
+      <!-- Tab: katalog -->
+      <div id="tab-products" class="hidden">
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Produk</th>
+                <th>Harga contoh</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="productsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <b>VOID STORE</b>
+    <p>TOP UP • SEWA AKUN • STOCK AKUN</p>
+    <p>© 2026 VOID STORE — Demo lokal untuk Sublime Text.</p>
+  </footer>
+
+  <script>
+    "use strict";
+
+    /* ===== Konfigurasi & data ===== */
+    const ADMIN_WA = "6285813172078";
+
+    const packages = [
+      ["uc60",  "UC 60",  60,  15000],
+      ["uc120", "UC 120", 120, 29000],
+      ["uc180", "UC 180", 180, 43000],
+      ["uc240", "UC 240", 240, 57000],
+      ["uc325", "UC 325", 325, 76000],
+      ["uc385", "UC 385", 385, 90000],
+      ["uc445", "UC 445", 445, 104000],
+      ["uc505", "UC 505", 505, 118000],
+      ["uc565", "UC 565", 565, 132000],
+      ["uc660", "UC 660", 660, 152000]
+    ].map(([id, name, uc, price]) => ({ id, name, uc, price }));
+
+    /* ===== Helper ===== */
+    const $ = id => document.getElementById(id);
+
+    const money = n =>
+      new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0
+      }).format(n);
+
+    const esc = s =>
+      String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c]));
+
+    let selected = null;
+
+    /* ===== Penyimpanan pesanan (localStorage) ===== */
+    function orders() {
+      try {
+        return JSON.parse(localStorage.getItem("voidstore_demo_orders") || "[]");
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveOrders(a) {
+      localStorage.setItem("voidstore_demo_orders", JSON.stringify(a));
+    }
+
+    /* ===== Render katalog (cari + urutkan) ===== */
+    function renderProducts() {
+      let q = $("catalogSearch").value.trim().toLowerCase();
+      let s = $("catalogSort").value;
+
+      let a = packages.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        String(p.uc).includes(q) ||
+        String(p.price).includes(q)
+      );
+
+      if (s === "low")  a.sort((x, y) => x.price - y.price);
+      if (s === "high") a.sort((x, y) => y.price - x.price);
+      if (s === "uc")   a.sort((x, y) => x.uc - y.uc);
+
+      $("catalogCount").textContent = `${a.length} dari ${packages.length} paket`;
+      $("catalogMessage").classList.toggle("hidden", a.length > 0);
+
+      $("products").innerHTML = a.map(p => `
+        <article class="product">
+          <div class="uc-art"><div class="uc-token">UC</div></div>
+          <div class="product-body">
+            <span class="muted">PUBG MOBILE • DIGITAL</span>
+            <h3>${esc(p.name)}</h3>
+            <div class="price">${money(p.price)}</div>
+            <button class="btn" data-buy="${p.id}">Pilih Paket</button>
+          </div>
+        </article>`).join("");
+
+      $("products").querySelectorAll("[data-buy]").forEach(b => {
+        b.onclick = () => choose(b.dataset.buy);
+      });
+    }
+
+    /* ===== Pilih paket -> tampilkan checkout ===== */
+    function choose(id) {
+      selected = packages.find(p => p.id === id);
+      $("selectedProduct").textContent = `Dipilih: ${selected.name} — ${money(selected.price)}`;
+      $("order").classList.remove("hidden");
+      location.hash = "order";
+      $("order").scrollIntoView({ behavior: "smooth" });
+    }
+
+    /* ===== Render dashboard admin ===== */
+    function renderAdmin() {
+      let a = orders();
+
+      $("ordersBody").innerHTML = a.length
+        ? a.slice().reverse().map(o => `
+            <tr>
+              <td>${esc(o.time)}</td>
+              <td>${esc(o.name)}<br>${esc(o.playerId)}</td>
+              <td>${esc(o.product)}<br>${esc(o.price)}</td>
+              <td>${esc(o.payment)}</td>
+              <td>${esc(o.status)}</td>
+            </tr>`).join("")
+        : '<tr><td colspan="5">Belum ada pesanan demo.</td></tr>';
+
+      $("productsBody").innerHTML = packages.map(p => `
+        <tr>
+          <td>${esc(p.name)}</td>
+          <td>${money(p.price)}</td>
+          <td>Aktif (demo)</td>
+        </tr>`).join("");
+    }
+
+    /* ===== Event: cari & urutkan ===== */
+    $("catalogSearch").oninput = renderProducts;
+    $("catalogSort").onchange = renderProducts;
+
+    /* ===== Event: submit pesanan ===== */
+    $("orderForm").onsubmit = e => {
+      e.preventDefault();
+      if (!selected) return;
+
+      let name     = $("customerName").value.trim();
+      let nickname = $("nickname").value.trim();
+      let playerId = $("playerId").value.trim();
+      let phone    = $("phone").value.trim();
+      let payment  = $("paymentMethod").value;
+
+      if (!/^[0-9]{5,30}$/.test(playerId)) {
+        $("orderMessage").textContent = "Player ID harus 5–30 digit angka.";
+        return;
+      }
+
+      let o = {
+        time: new Date().toLocaleString("id-ID"),
+        name,
+        nickname,
+        playerId,
+        phone,
+        product: selected.name,
+        price: money(selected.price),
+        payment,
+        status: "Menunggu konfirmasi admin"
+      };
+
+      let a = orders();
+      a.push(o);
+      saveOrders(a);
+      renderAdmin();
+
+      let text =
+        `Halo Admin VOID STORE, saya ingin bertanya tentang pesanan (DEMO).\n` +
+        `Paket: ${selected.name}\n` +
+        `Harga contoh: ${money(selected.price)}\n` +
+        `Nama: ${name}\n` +
+        `Nickname PUBG: ${nickname}\n` +
+        `Player ID: ${playerId}\n` +
+        `WhatsApp pembeli: ${phone}\n` +
+        `Metode pembayaran: ${payment}\n` +
+        `Mohon konfirmasi harga dan stok sebelum pembayaran.`;
+
+      $("orderMessage").textContent = "Pesanan tersimpan secara lokal. WhatsApp akan terbuka untuk diperiksa.";
+      window.open("https://wa.me/" + ADMIN_WA + "?text=" + encodeURIComponent(text), "_blank", "noopener");
+    };
+
+    /* ===== Event: batal pesanan ===== */
+    $("cancelOrder").onclick = () => {
+      selected = null;
+      $("orderForm").reset();
+      $("order").classList.add("hidden");
+      location.hash = "produk";
+    };
+
+    /* ===== Link WhatsApp di bagian kontak ===== */
+    $("whatsappLink").href =
+      "https://wa.me/" + ADMIN_WA + "?text=" +
+      encodeURIComponent("Halo Admin VOID STORE, saya ingin bertanya tentang layanan PUBG Mobile.");
+
+    /* ===== Event: reset data demo ===== */
+    $("clearOrders").onclick = () => {
+      if (confirm("Hapus seluruh pesanan demo lokal?")) {
+        saveOrders([]);
+        renderAdmin();
+      }
+    };
+
+    /* ===== Event: tab admin ===== */
+    document.querySelectorAll("[data-tab]").forEach(b => {
+      b.onclick = () => {
+        let t = b.dataset.tab;
+        $("tab-orders").classList.toggle("hidden", t !== "orders");
+        $("tab-products").classList.toggle("hidden", t !== "products");
+      };
+    });
+
+    /* ===== Jalankan saat halaman dibuka ===== */
+    renderProducts();
+    renderAdmin();
+  </script>
+
+</body>
+
+</html>
