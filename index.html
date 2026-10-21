@@ -816,6 +816,55 @@
     }
 
 
+    /* ===== Paket spesial & katalog panjang ===== */
+    .catalog-section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0 12px;
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .catalog-section-title::after { content: ""; flex: 1; height: 1px; background: #2a2f36; }
+    #specials.special-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+    .product.special {
+      border-color: #4a3908;
+      background: linear-gradient(160deg, #171205, #0a0c0f 62%);
+    }
+    .special-art {
+      position: relative;
+      height: 124px;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(ellipse at center, var(--glow, #2a2209) 0%, #0a0c0f 78%);
+      border-bottom: 1px solid #2a2208;
+    }
+    .special-art img {
+      height: 98px;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .6));
+    }
+    .special-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--gold);
+      color: #1a1400;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .special-desc { margin: 0 0 4px; font-size: 13px; }
+    .more-wrap { display: flex; justify-content: center; margin: 20px 0 6px; }
+    .more-wrap .btn { width: auto; min-width: 260px; max-width: 100%; }
+
     /* ===== Kartu instruksi pembayaran ===== */
     .pay-card {
       margin-top: 14px;
@@ -1003,7 +1052,16 @@
         </div>
       </div>
 
+      <div id="specialWrap" class="hidden">
+        <div class="catalog-section-title">Paket Spesial</div>
+        <div id="specials" class="grid product-grid special-grid"></div>
+        <div class="catalog-section-title" id="regularTitle"></div>
+      </div>
+
       <div id="products" class="grid product-grid"></div>
+      <div id="catalogMoreWrap" class="more-wrap hidden">
+        <button id="catalogMoreBtn" class="btn" type="button"></button>
+      </div>
       <p id="catalogMessage" class="message hidden">Paket tidak ditemukan.</p>
     </section>
 
@@ -1117,31 +1175,80 @@
       "Transfer Bank": { type: "bank",    bank: "", name: "", number: "" }
     };
 
-    /* Katalog top up — harga CONTOH (acuan kisaran harga marketplace top up Jul–Agu 2026).
-       Format tiap baris: [jumlah mata uang, harga rupiah]. Ganti dengan harga jualmu. */
+    /* Katalog top up. Format tiap baris: [jumlah mata uang, harga rupiah].
+       Urutan di sini = urutan default di halaman katalog. Paket yang bentuknya beda
+       (membership, WDP, bundle, pass) ada di SPECIAL dan tampil di bagian atas. */
     const mkPackages = (game, unit, rows) => rows.map(([amount, price]) => ({
       id: game + amount,
-      name: (game === "pubgm" ? "UC " + amount : amount.toLocaleString("id-ID") + " " + unit),
+      name: (game === "pubgm" ? "UC " + amount.toLocaleString("id-ID") : amount.toLocaleString("id-ID") + " " + unit),
       amount, price
     }));
 
     const CATALOG = {
       pubgm: mkPackages("pubgm", "UC", [
-        [60, 15000], [120, 29000], [180, 43000], [240, 57000], [325, 76000],
-        [385, 90000], [445, 104000], [505, 118000], [565, 132000], [660, 152000]
+        [60, 16000], [120, 32000], [180, 48000], [240, 64000], [325, 77833],
+        [385, 93833], [445, 109833], [505, 125833], [565, 141833], [660, 155665],
+        [720, 171232], [780, 186798], [840, 202365], [985, 233498], [1045, 249064],
+        [1105, 264631], [1165, 280197], [1225, 295764], [1320, 311330], [1380, 326897],
+        [1440, 342463], [1500, 358030], [1800, 389163], [1920, 420296], [1980, 435862],
+        [2040, 451429], [2125, 466995], [2460, 544828], [2520, 560394], [2785, 622660],
+        [2815, 630443], [2965, 669360], [3025, 684926], [3120, 700493], [3850, 778325],
+        [4000, 817241], [4090, 840591], [4175, 856158], [4355, 902857], [4510, 933990],
+        [4835, 1011823], [5015, 1058522], [5170, 1089655], [5350, 1136355], [5650, 1167488],
+        [5890, 1229754], [5975, 1245320], [6035, 1260887], [6310, 1323153], [6635, 1400985],
+        [6875, 1463251], [7000, 1486601], [7150, 1525517], [8100, 1556650], [8220, 1587783],
+        [8425, 1634483], [8760, 1712315], [9085, 1790148], [9900, 1945813], [10020, 1976946],
+        [11005, 2210443], [12010, 2350542], [13025, 2591822], [14075, 2801970], [15070, 3035468],
+        [16200, 3113300], [17010, 3307881], [18000, 3502463], [19015, 3743743], [20050, 3891625],
+        [24300, 4669950], [25020, 4841182], [30010, 5853004], [32400, 6226600], [35010, 6810344],
+        [40500, 7783250], [45010, 8717240], [48600, 9339900], [50010, 9674580], [55660, 10842067],
+        [56700, 10896550], [60000, 11643742], [64800, 12453200], [65010, 12507683], [70000, 13550638],
+        [72900, 14009850], [75025, 14476845], [81000, 15566500], [85000, 16383741], [89100, 17123150],
+        [90085, 17356648], [95020, 18360687], [97200, 18679800], [100320, 19380293]
       ]),
       ff: mkPackages("ff", "Diamond", [
-        [5, 1000], [12, 2500], [50, 8000], [70, 11000], [140, 22000],
-        [355, 50000], [720, 101000], [1450, 205000], [2180, 308000], [3640, 510000]
+        [5, 900], [12, 2800], [20, 4000], [25, 5000], [50, 7500],
+        [70, 10000], [100, 14500], [120, 17000], [140, 19000], [150, 21500],
+        [180, 26000], [200, 28500], [210, 32500], [250, 35500], [280, 39000],
+        [355, 48000], [400, 54500], [425, 57500], [475, 63000], [500, 67000],
+        [545, 73000], [635, 84500], [720, 93500], [790, 103500], [800, 105000],
+        [860, 113000], [925, 122000], [1000, 130000], [1075, 138000], [1050, 140000],
+        [1200, 156000], [1440, 186000], [1510, 194000], [1580, 205000], [1800, 233000],
+        [2000, 257000], [2180, 283000], [3640, 468000], [4000, 510000], [7290, 920000]
       ]),
       ml: mkPackages("ml", "Diamond", [
-        [5, 1500], [12, 3500], [28, 7800], [59, 15800], [85, 22500],
-        [170, 44500], [240, 62500], [408, 107000], [568, 148000], [875, 227000]
+        [5, 1800], [12, 4500], [19, 6500], [28, 9500], [44, 13500],
+        [59, 17500], [85, 26000], [100, 31000], [112, 35500], [140, 44000],
+        [170, 50000], [172, 51500], [200, 60000], [240, 72000], [277, 82000],
+        [284, 84000], [296, 88000], [305, 90500], [344, 101500], [355, 104500],
+        [384, 113000], [408, 120000], [429, 126500], [500, 147000], [514, 150000],
+        [568, 161000], [600, 172000], [716, 206000], [875, 245000], [966, 271000],
+        [1050, 298000], [1136, 323000], [1159, 330000], [1443, 410000], [2010, 535000],
+        [2625, 714000], [4020, 1085000], [4830, 1285000], [6840, 1820000], [8850, 2420000],
+        [9288, 2475000]
       ]),
       valo: mkPackages("valo", "VP", [
-        [475, 54000], [1000, 108000], [1475, 162000], [2050, 213000], [2525, 266000],
-        [3650, 368000], [4125, 422000], [4650, 476000], [5350, 530000], [11000, 1050000]
+        [475, 53500], [1000, 106500], [1475, 157500], [2050, 210000], [2525, 262000],
+        [3050, 315000], [3650, 365000], [4125, 417000], [4650, 468000], [5350, 523000],
+        [5700, 573000], [5825, 575000], [6350, 625000], [7300, 725000], [9000, 880000],
+        [11000, 1030000], [15125, 1440000], [22000, 2040000]
       ])
+    };
+
+    /* Paket spesial (tampil di atas katalog, bentuk kartunya beda).
+       kind: member | wdp | bundle | pass  -> menentukan ikon.
+       Mau pakai gambar asli? isi "img" dengan path gambar, contoh: img: "assets/ml-twilight.png" */
+    const SPECIAL = {
+      ff: [
+        { id: "ff-member-weekly",  name: "Membership Mingguan", price: 28500, kind: "member", tag: "MEMBERSHIP", desc: "Paket langganan mingguan" },
+        { id: "ff-member-monthly", name: "Membership Bulanan",  price: 84000, kind: "member", tag: "MEMBERSHIP", desc: "Paket langganan bulanan" }
+      ],
+      ml: [
+        { id: "ml-wdp",           name: "Weekly Diamond Pass (WDP)", price: 30500,  kind: "wdp",    tag: "WDP",    desc: "Harga untuk 1 WDP" },
+        { id: "ml-weekly-elite",  name: "Weekly Elite Bundle",       price: 17000,  kind: "bundle", tag: "BUNDLE", desc: "Bundle mingguan" },
+        { id: "ml-monthly-epic",  name: "Monthly Epic Bundle",       price: 82000,  kind: "bundle", tag: "BUNDLE", desc: "Bundle bulanan" },
+        { id: "ml-twilight-pass", name: "Twilight Pass",             price: 167000, kind: "pass",   tag: "PASS",   desc: "Pass spesial Mobile Legends" }
+      ]
     };
 
     /* Isian form checkout per game */
@@ -1247,9 +1354,60 @@
       renderProducts();
     }
 
+    /* Ikon paket spesial (SVG buatan sendiri, ikut warna game). Bisa diganti gambar asli lewat "img" di SPECIAL. */
+    function specialIcon(kind, gameId) {
+      const pal = {
+        ff:   ["#ffd9a0", "#ff8a1f", "#a3400d"],
+        ml:   ["#d2dcff", "#6f7dff", "#3b2fb5"],
+        pubgm:["#ffe889", "#c58c12", "#6b4f0a"],
+        valo: ["#ffb9bf", "#ff4655", "#9c1b2b"]
+      }[gameId] || ["#ffe889", "#c58c12", "#6b4f0a"];
+      const star = (cx, cy, R, r) => {
+        let pts = [];
+        for (let i = 0; i < 10; i++) {
+          const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R;
+          pts.push((cx + rad * Math.cos(a)).toFixed(1) + "," + (cy + rad * Math.sin(a)).toFixed(1));
+        }
+        return '<polygon points="' + pts.join(" ") + '" fill="#fff" opacity=".92"/>';
+      };
+      let body = "";
+      if (kind === "member") {
+        body = '<rect x="30" y="14" width="140" height="72" rx="10" fill="url(#g)"/>' +
+               '<rect x="30" y="28" width="140" height="13" fill="#000" opacity=".25"/>' +
+               '<rect x="42" y="70" width="52" height="6" rx="3" fill="#fff" opacity=".5"/>' + star(138, 60, 15, 6.5);
+      } else if (kind === "wdp") {
+        body = '<g transform="translate(70,2) scale(.6)"><polygon points="25,12 75,12 96,40 50,92 4,40" fill="url(#g)"/>' +
+               '<polygon points="25,12 36,40 4,40" fill="#fff" opacity=".28"/><polygon points="75,12 64,40 96,40" fill="#000" opacity=".16"/>' +
+               '<polygon points="36,40 64,40 50,92" fill="#fff" opacity=".16"/></g>' +
+               '<rect x="58" y="68" width="84" height="22" rx="11" fill="url(#g)"/>' +
+               '<text x="100" y="84" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="15" text-anchor="middle" fill="#fff">WDP</text>';
+      } else if (kind === "bundle") {
+        body = '<rect x="56" y="42" width="88" height="46" rx="4" fill="url(#g)"/>' +
+               '<rect x="50" y="30" width="100" height="16" rx="4" fill="url(#g)"/><rect x="50" y="30" width="100" height="16" rx="4" fill="#000" opacity=".2"/>' +
+               '<rect x="94" y="30" width="12" height="58" fill="#fff" opacity=".88"/>' +
+               '<circle cx="86" cy="22" r="10" fill="none" stroke="#fff" stroke-width="5" opacity=".9"/>' +
+               '<circle cx="114" cy="22" r="10" fill="none" stroke="#fff" stroke-width="5" opacity=".9"/>';
+      } else {
+        body = '<rect x="26" y="20" width="148" height="60" rx="9" fill="url(#g)"/>' +
+               '<circle cx="26" cy="50" r="9" fill="#0a0c0f"/><circle cx="174" cy="50" r="9" fill="#0a0c0f"/>' +
+               '<line x1="132" y1="26" x2="132" y2="74" stroke="#fff" stroke-width="2" stroke-dasharray="4 4" opacity=".6"/>' +
+               star(80, 50, 20, 8.5) +
+               '<rect x="108" y="40" width="16" height="5" rx="2.5" fill="#fff" opacity=".6"/><rect x="108" y="54" width="16" height="5" rx="2.5" fill="#fff" opacity=".4"/>';
+      }
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><defs>' +
+        '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + pal[0] + '"/>' +
+        '<stop offset=".55" stop-color="' + pal[1] + '"/><stop offset="1" stop-color="' + pal[2] + '"/></linearGradient></defs>' +
+        body + '</svg>';
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    }
+
+    const PAGE_SIZE = 24;                 // jumlah paket yang tampil per "halaman"
+    let catalogVisible = PAGE_SIZE, catalogKey = "";
+
     function renderProducts() {
       const g = gameOf(catalogGame);
       const list = CATALOG[catalogGame];
+      const specials = SPECIAL[catalogGame] || [];
       $("catalogBack").href = "#layanan/" + catalogGame;
 
       $("catalogTag").textContent = "KATALOG TOKO / " + g.name;
@@ -1258,13 +1416,22 @@
       $("catalogSearch").placeholder = "Contoh: " + list[5].name;
       $("sortAmount").textContent = "Nominal " + g.currency;
       $("products").style.setProperty("--glow", GLOW[catalogGame]);
+      $("specials").style.setProperty("--glow", GLOW[catalogGame]);
 
       let q = $("catalogSearch").value.trim().toLowerCase();
       let s = $("catalogSort").value;
 
+      const key = catalogGame + "|" + q + "|" + s;
+      if (key !== catalogKey) { catalogKey = key; catalogVisible = PAGE_SIZE; }
+
       let a = list.filter(p =>
         p.name.toLowerCase().includes(q) ||
         String(p.amount).includes(q) ||
+        String(p.price).includes(q)
+      );
+      const sp = specials.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.tag.toLowerCase().includes(q) ||
         String(p.price).includes(q)
       );
 
@@ -1272,12 +1439,35 @@
       if (s === "high") a.sort((x, y) => y.price - x.price);
       if (s === "uc")   a.sort((x, y) => x.amount - y.amount);
 
-      $("catalogCount").textContent = `${a.length} dari ${list.length} paket`;
-      $("catalogMessage").classList.toggle("hidden", a.length > 0);
+      const shown = a.slice(0, catalogVisible);
+      const rest = a.length - shown.length;
 
-      $("products").innerHTML = a.map(p => `
+      $("catalogCount").textContent = `${a.length} dari ${list.length} paket` +
+        (specials.length ? ` • ${sp.length} paket spesial` : "");
+      $("catalogMessage").classList.toggle("hidden", a.length + sp.length > 0);
+
+      $("specialWrap").classList.toggle("hidden", sp.length === 0);
+      $("regularTitle").classList.toggle("hidden", sp.length === 0 || a.length === 0);
+      $("regularTitle").textContent = "Top Up " + g.currency;
+
+      $("specials").innerHTML = sp.map(p => `
+        <article class="product special">
+          <div class="special-art">
+            <span class="special-badge">${esc(p.tag)}</span>
+            <img src="${esc(p.img || specialIcon(p.kind, catalogGame))}" alt="${esc(p.name)}">
+          </div>
+          <div class="product-body">
+            <span class="muted">${esc(g.name)} • PAKET SPESIAL</span>
+            <h3>${esc(p.name)}</h3>
+            <p class="muted special-desc">${esc(p.desc || "")}</p>
+            <div class="price">${money(p.price)}</div>
+            <button class="btn" data-buy="${p.id}">Pilih Paket</button>
+          </div>
+        </article>`).join("");
+
+      $("products").innerHTML = shown.map(p => `
         <article class="product">
-          <div class="uc-art"><img src="${currencyIcon(catalogGame, list.indexOf(p))}" alt="${esc(g.currency)} ${esc(g.name)}"></div>
+          <div class="uc-art"><img src="${currencyIcon(catalogGame, Math.floor(list.indexOf(p) * 10 / list.length))}" alt="${esc(g.currency)} ${esc(g.name)}"></div>
           <div class="product-body">
             <span class="muted">${esc(g.name)} • DIGITAL</span>
             <h3>${esc(p.name)}</h3>
@@ -1286,10 +1476,18 @@
           </div>
         </article>`).join("");
 
-      $("products").querySelectorAll("[data-buy]").forEach(b => {
+      $("catalogMoreWrap").classList.toggle("hidden", rest <= 0);
+      $("catalogMoreBtn").textContent = `Tampilkan lebih banyak (${rest} paket lagi)`;
+
+      document.querySelectorAll("#specials [data-buy], #products [data-buy]").forEach(b => {
         b.onclick = () => choose(b.dataset.buy);
       });
     }
+
+    $("catalogMoreBtn").addEventListener("click", () => {
+      catalogVisible += PAGE_SIZE;
+      renderProducts();
+    });
 
     /* ===== Atur isian form sesuai game ===== */
     function applyForm(gid) {
@@ -1317,7 +1515,8 @@
 
     /* ===== Pilih paket -> tampilkan checkout ===== */
     function choose(id) {
-      const p = CATALOG[catalogGame].find(x => x.id === id);
+      const p = CATALOG[catalogGame].find(x => x.id === id) ||
+                (SPECIAL[catalogGame] || []).find(x => x.id === id);
       selected = Object.assign({ game: catalogGame }, p);
       applyForm(catalogGame);
       $("selectedProduct").textContent = `Dipilih: ${gameOf(catalogGame).name} — ${p.name} — ${money(p.price)}`;
