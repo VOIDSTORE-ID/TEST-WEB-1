@@ -815,6 +815,40 @@
       }
     }
 
+
+    /* ===== Kartu instruksi pembayaran ===== */
+    .pay-card {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid #3a2f0a;
+      border-radius: 10px;
+      background: linear-gradient(160deg, #1a1608, #101317 70%);
+    }
+    .pay-card h3 { margin: 0 0 12px; color: var(--gold); font-size: 16px; }
+    .pay-amount {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+      padding: 10px 12px; margin-bottom: 12px;
+      background: #0c0e11; border-radius: 8px;
+    }
+    .pay-amount span { color: var(--muted); font-size: 13px; }
+    .pay-amount strong { font-size: 22px; color: #fff; }
+    .copy-btn {
+      margin-left: auto; padding: 6px 10px;
+      border: 1px solid #3a3f47; border-radius: 6px;
+      background: #1b1f25; color: #f5f5f5; font-size: 12px; cursor: pointer;
+    }
+    .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .pay-acc { display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; margin: 0 0 12px; }
+    .pay-acc dt { color: var(--muted); font-size: 13px; }
+    .pay-acc dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pay-acc dd strong { font-size: 18px; letter-spacing: .5px; }
+    .pay-qr { display: flex; justify-content: center; margin-bottom: 8px; }
+    .pay-qr img { width: 100%; max-width: 280px; border-radius: 10px; background: #fff; padding: 8px; }
+    .pay-steps { margin: 12px 0; padding-left: 20px; color: #d6dae0; font-size: 14px; }
+    .pay-steps li { margin: 3px 0; }
+    .pay-warn { margin: 12px 0 0; font-size: 12px; color: #e0b44a; }
+    .pay-wait { padding: 10px 12px; border-radius: 8px; background: #15191e; color: var(--muted); }
+
     /* ===== Background black hole 3D untuk SEMUA halaman ===== */
     body.gl-bg #spaceGL {
       position: fixed;
@@ -1003,6 +1037,7 @@
         <label for="paymentMethod">Metode pembayaran</label>
         <select id="paymentMethod" required>
           <option value="">Pilih metode</option>
+          <option>QRIS</option>
           <option>DANA</option>
           <option>GoPay</option>
           <option>OVO</option>
@@ -1011,6 +1046,8 @@
         </select>
 
         <p id="orderMessage" class="message">Belum ada pesanan.</p>
+
+        <div id="payInfo" class="pay-card hidden" aria-live="polite"></div>
 
         <button class="btn" type="submit">Buat Pesanan &amp; WhatsApp</button>
         <button class="btn secondary" id="cancelOrder" type="button">Batal</button>
@@ -1067,6 +1104,18 @@
 
     /* ===== Konfigurasi & data ===== */
     const ADMIN_WA = "6285813172078";
+
+    /* ===== Akun pembayaran (ISI DENGAN DATA ASLI) =====
+       - Kosongkan "number" / "image" kalau belum siap: customer akan diminta menunggu detail dari admin via WhatsApp.
+       - QRIS: isi "image" dengan path gambar QR, contoh "assets/qris.png" (atau data URI).
+       - Pastikan nama & nomor sama persis dengan akun aslimu. */
+    const PAYMENT_ACCOUNTS = {
+      "QRIS":          { type: "qris",    image: "", note: "Scan dengan aplikasi e-wallet atau mobile banking apa pun." },
+      "DANA":          { type: "ewallet", name: "", number: "085813172078" },
+      "GoPay":         { type: "ewallet", name: "", number: "085813172078" },
+      "OVO":           { type: "ewallet", name: "", number: "085813172078" },
+      "Transfer Bank": { type: "bank",    bank: "", name: "", number: "" }
+    };
 
     /* Katalog top up — harga CONTOH (acuan kisaran harga marketplace top up Jul–Agu 2026).
        Format tiap baris: [jumlah mata uang, harga rupiah]. Ganti dengan harga jualmu. */
@@ -1263,6 +1312,7 @@
         lastFormGame = gid;
       }
       $("orderMessage").textContent = "Belum ada pesanan.";
+      hidePayInfo();
     }
 
     /* ===== Pilih paket -> tampilkan checkout ===== */
@@ -1293,6 +1343,67 @@
     /* ===== Event: cari & urutkan ===== */
     $("catalogSearch").oninput = renderProducts;
     $("catalogSort").onchange = renderProducts;
+
+    /* ===== Instruksi pembayaran (tampil langsung setelah pesanan dibuat) ===== */
+    function hidePayInfo() {
+      const el = $("payInfo");
+      el.classList.add("hidden");
+      el.innerHTML = "";
+    }
+
+    function showPayInfo(method, priceNum, summary) {
+      const el = $("payInfo");
+      const acc = PAYMENT_ACCOUNTS[method];
+      if (!acc) { hidePayInfo(); return; }          // "Konfirmasi ke admin" -> tanpa kartu
+
+      const price = money(priceNum);
+      const ready = acc.type === "qris" ? !!acc.image : !!acc.number;
+      let h = `<h3>Cara bayar — ${esc(method)}</h3>
+        <div class="pay-amount"><span>Total bayar</span>
+          <strong>${esc(price)}</strong>
+          <button type="button" class="copy-btn" data-copy="${esc(String(priceNum))}">Salin nominal</button></div>`;
+
+      if (!ready) {
+        h += `<p class="pay-wait">Detail pembayaran ${esc(method)} akan dikirim admin lewat WhatsApp. Tunggu balasan admin sebelum membayar.</p>`;
+      } else if (acc.type === "qris") {
+        h += `<div class="pay-qr"><img src="${esc(acc.image)}" alt="QRIS VOID MARKET"></div>
+          <p class="muted">${esc(acc.note || "")}</p>`;
+      } else {
+        h += `<dl class="pay-acc">` +
+          (acc.bank ? `<dt>Bank</dt><dd>${esc(acc.bank)}</dd>` : "") +
+          (acc.name ? `<dt>Atas nama</dt><dd>${esc(acc.name)}</dd>` : "") +
+          `<dt>Nomor</dt><dd><strong>${esc(acc.number)}</strong>
+            <button type="button" class="copy-btn" data-copy="${esc(acc.number)}">Salin nomor</button></dd></dl>`;
+      }
+
+      const proof = `Halo Admin VOID MARKET, saya sudah membayar.\n${summary}\nMetode: ${method}\nTotal: ${price}\nBukti pembayaran saya lampirkan di chat ini.`;
+      h += `<ol class="pay-steps">
+          <li>Bayar sesuai <b>nominal pas</b> di atas.</li>
+          <li>Screenshot bukti pembayaran.</li>
+          <li>Kirim buktinya ke admin lewat tombol di bawah.</li>
+        </ol>
+        <a class="btn" target="_blank" rel="noopener" href="https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(proof)}">Kirim bukti bayar via WhatsApp</a>
+        <p class="pay-warn">Hanya bayar ke akun yang tertera di sini atau yang diberikan admin lewat WhatsApp resmi.</p>`;
+
+      el.innerHTML = h;
+      el.classList.remove("hidden");
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    $("payInfo").addEventListener("click", e => {
+      const b = e.target.closest("[data-copy]");
+      if (!b) return;
+      const val = b.dataset.copy, old = b.textContent;
+      const done = () => { b.textContent = "Tersalin ✓"; setTimeout(() => { b.textContent = old; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(done, () => {});
+      } else {
+        const t = document.createElement("textarea");
+        t.value = val; document.body.appendChild(t); t.select();
+        try { document.execCommand("copy"); done(); } catch (_) {}
+        t.remove();
+      }
+    });
 
     /* ===== Event: submit pesanan ===== */
     $("orderForm").onsubmit = e => {
@@ -1348,7 +1459,8 @@
         `Metode pembayaran: ${payment}\n` +
         `Mohon konfirmasi harga dan stok sebelum pembayaran.`;
 
-      $("orderMessage").textContent = "Pesanan dibuat. WhatsApp akan terbuka untuk konfirmasi ke admin.";
+      $("orderMessage").textContent = "Pesanan dibuat. Lihat cara bayar di bawah, lalu konfirmasi ke admin lewat WhatsApp.";
+      showPayInfo(payment, selected.price, `Game: ${g.name}\nPaket: ${selected.name}\n${f.idShort}: ${playerId}` + (f.zone ? ` (${zone})` : ""));
       window.open("https://wa.me/" + ADMIN_WA + "?text=" + encodeURIComponent(text), "_blank", "noopener");
     };
 
@@ -1358,6 +1470,7 @@
       selected = null;
       lastFormGame = null;
       $("orderForm").reset();
+      hidePayInfo();
       location.hash = "produk/" + back;
     };
 
