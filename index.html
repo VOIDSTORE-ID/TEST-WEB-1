@@ -813,11 +813,30 @@
 
       <div class="tag home-games-title" id="pilih-game">PILIH GAME</div>
       <div class="game-list" id="gameList"></div>
+      <p style="margin-top:18px"><a class="btn secondary" href="#games">Lihat Semua Game →</a></p>
+    </section>
+
+    <!-- ===== SEMUA GAME ===== -->
+    <section id="games" class="page hidden">
+      <a class="back-link" href="#beranda">← Kembali ke Home</a>
+      <div class="tag">LAYANAN KAMI</div>
+      <h2>SEMUA <span class="gold">GAME</span></h2>
+      <p class="muted">Pilih game untuk melihat layanan Top Up dan Stock Akun.</p>
+
+      <div class="catalog-controls" style="grid-template-columns:1fr">
+        <div>
+          <label for="gameSearch">Cari game</label>
+          <input id="gameSearch" placeholder="Contoh: PUBG">
+        </div>
+      </div>
+
+      <div class="game-list" id="allGameList"></div>
+      <p id="gameEmpty" class="message hidden">Game tidak ditemukan.</p>
     </section>
 
     <!-- ===== LAYANAN (per game) ===== -->
     <section id="layanan" class="page hidden">
-      <a class="back-link" href="#beranda">← Kembali ke Home</a>
+      <a class="back-link" href="#games">← Kembali ke Semua Game</a>
       <div class="tag" id="servicesTag"></div>
       <h2 id="servicesTitle"></h2>
       <div class="grid services-grid" id="servicesGrid"></div>
@@ -1327,19 +1346,36 @@
       return html;
     }
 
-    function renderGames() {
-      $("gameList").innerHTML = GAMES.map(g => `
-        <a class="game-card" href="#layanan/${g.id}">
+    const HOME_LIMIT = 4;   // jumlah game yang tampil di Home (sisanya lewat "Lihat Semua Game")
+
+    function gameCard(g, href, label) {
+      return `
+        <a class="game-card" href="${href}">
           <div class="game-img" style="background:${g.bg}">
             <span class="fallback">${g.name}</span>
             ${g.img ? '<img src="' + g.img + '" alt="' + g.name + '">' : ""}
           </div>
           <div class="game-info">
             <b>${g.name}</b>
-            <span class="muted">Lihat layanan →</span>
+            <span class="muted">${label}</span>
           </div>
-        </a>`).join("");
+        </a>`;
     }
+
+    function renderAllGames() {
+      const q = $("gameSearch").value.trim().toLowerCase();
+      const list = GAMES.filter(g => g.name.toLowerCase().includes(q));
+      $("allGameList").innerHTML = list.map(g => gameCard(g, "#layanan/" + g.id, "Lihat layanan →")).join("");
+      $("gameEmpty").classList.toggle("hidden", list.length > 0);
+    }
+
+    function renderGames() {
+      // Di Home, klik game -> halaman semua game
+      $("gameList").innerHTML = GAMES.slice(0, HOME_LIMIT).map(g => gameCard(g, "#games", "Pilih game →")).join("");
+      renderAllGames();
+    }
+
+    $("gameSearch").oninput = renderAllGames;
 
     function renderServices(g) {
       $("servicesTag").textContent = "LAYANAN / " + g.name;
@@ -1578,7 +1614,7 @@
     document.addEventListener("keydown", e => { if (e.key === "Escape") setMore(false); });
 
     /* ===== Router halaman (satu halaman tampil per menu) ===== */
-    const PAGES = ["beranda", "layanan", "produk", "order", "kontak", "riwayat", "stock", "akun"];
+    const PAGES = ["beranda", "layanan", "games", "produk", "order", "kontak", "riwayat", "stock", "akun"];
 
     function route() {
       // format hash: "#halaman" atau "#halaman/parameter"
@@ -1606,12 +1642,12 @@
 
       PAGES.forEach(id => $(id).classList.toggle("hidden", id !== h));
 
-      const active = ["layanan", "produk", "order", "stock", "akun"].includes(h) ? "beranda" : h;
+      const active = ["games", "layanan", "produk", "order", "stock", "akun"].includes(h) ? "beranda" : h;
       setMore(false);
       document.querySelectorAll("[data-page]").forEach(a =>
         a.classList.toggle("active", a.dataset.page === active));
 
-      const titles = { beranda: "Home", layanan: "Layanan", produk: "Produk", order: "Checkout", kontak: "Kontak", riwayat: "Riwayat Pesanan", stock: "Stock Akun", akun: "Detail Akun" };
+      const titles = { beranda: "Home", games: "Semua Game", layanan: "Layanan", produk: "Produk", order: "Checkout", kontak: "Kontak", riwayat: "Riwayat Pesanan", stock: "Stock Akun", akun: "Detail Akun" };
       document.title = "VOID MARKET — " + titles[h];
       window.scrollTo(0, 0);
     }
