@@ -777,6 +777,79 @@
         padding: 9px 5px;
       }
     }
+  
+    /* ===== Background animasi hero (black hole & bintang) ===== */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(120deg, #040405, #0b0b0d);
+    }
+
+    #spaceBg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* lapisan gelap tipis di kiri supaya tulisan tetap jelas */
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(4,4,5,.78) 0%, rgba(4,4,5,.4) 42%, transparent 68%);
+    }
+
+    .hero > :not(canvas) {
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 650px) {
+      .hero::after {
+        background: linear-gradient(180deg, rgba(4,4,5,.1), rgba(4,4,5,.55));
+      }
+    }
+
+    /* ===== Background black hole 3D untuk SEMUA halaman ===== */
+    body.gl-bg #spaceGL {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      display: block;
+    }
+    body.gl-bg #spaceBg { display: none; }
+    body.gl-bg main,
+    body.gl-bg footer { position: relative; z-index: 1; }
+    body.gl-bg .hero { background: transparent; }
+    body.gl-bg .hero::after { display: none; }
+    body.gl-bg::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(4,4,5,.72) 0%, rgba(4,4,5,.38) 42%, rgba(4,4,5,.1) 72%);
+    }
+    body.gl-bg header {
+      background: rgba(8, 9, 11, .74);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+    body.gl-bg footer { background: rgba(8, 9, 11, .82); }
+    @media (max-width: 650px) {
+      body.gl-bg::after {
+        background: linear-gradient(180deg, rgba(4,4,5,.15), rgba(4,4,5,.6));
+      }
+    }
   </style>
 </head>
 
@@ -805,6 +878,7 @@
 
     <!-- ===== HERO ===== -->
     <section class="hero page" id="beranda">
+      <canvas id="spaceBg" aria-hidden="true"></canvas>
       <div class="tag">YOUR ONE-STOP GAME MARKET</div>
       <h1>VOID <span>MARKET</span></h1>
       <h3>TOP UP UC • SEWA AKUN • STOCK AKUN</h3>
@@ -1662,6 +1736,764 @@
     route();
   </script>
 
+
+  <script>
+/* ===== Background hero: BLACK HOLE 3D (WebGL ray-tracing, gaya Gargantua perak-tembaga) ===== */
+(function () {
+  // canvas baru: layer tetap (fixed) di belakang SEMUA halaman
+  const cv = document.createElement("canvas");
+  cv.id = "spaceGL";
+  cv.setAttribute("aria-hidden", "true");
+  const gl = cv.getContext("webgl", { antialias: false, alpha: false, powerPreference: "high-performance" });
+  if (!gl) return; // tidak ada WebGL -> pakai versi canvas 2D lama (di hero saja)
+
+  const VS = "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
+
+  const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes;      // ukuran canvas (px device)
+uniform float uDpr;
+uniform float uT;
+uniform vec3 uBH;       // x, y (css px, y ke bawah), r (radius bola hitam)
+uniform float uTheta;   // kemiringan cakram di layar (rad)
+uniform float uElev;    // sudut pandang kamera terhadap cakram (rad)
+uniform int uIter;
+
+const float PI = 3.14159265;
+const float TAU = 6.2831853;
+const float RIN = 2.4;
+const float ROUT = 9.4;
+const float CAMD = 40.0;
+const int MAXIT = 130;
+
+float hash21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+  return mix(mix(hash21(i), hash21(i+vec2(1,0)), f.x), mix(hash21(i+vec2(0,1)), hash21(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p){ float a=.5, s=0.; for(int i=0;i<4;i++){ s+=a*vnoise(p); p=p*2.03+vec2(17.1,9.2); a*=.5; } return s; }
+// noise yang periodik di sumbu x (supaya cakram melingkar tanpa sambungan)
+float pn(vec2 p, float N){
+  vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+  float x0 = mod(i.x, N), x1 = mod(i.x+1., N);
+  return mix(mix(hash21(vec2(x0,i.y)), hash21(vec2(x1,i.y)), f.x), mix(hash21(vec2(x0,i.y+1.)), hash21(vec2(x1,i.y+1.)), f.x), f.y);
+}
+float pfbm(vec2 p, float N){ float a=.5, s=0.; for(int i=0;i<3;i++){ s+=a*pn(p,N); p=p*2.; N*=2.; a*=.5; } return s; }
+
+// layar (css px, y bawah) -> koordinat lokal cakram (u sepanjang cakram, v tegak lurus), y atas
+vec2 toLocal(vec2 q){
+  vec2 d = vec2(q.x - uBH.x, -(q.y - uBH.y));
+  float c = cos(uTheta), s = sin(uTheta);
+  return vec2(dot(d, vec2(c, s)), dot(d, vec2(-s, c)));
+}
+
+vec3 stars(vec2 q, float t){
+  vec3 col = vec3(0.);
+  for(int L=0; L<2; L++){
+    float cell = L==0 ? 30. : 64.;
+    vec2 g = (q + vec2(-t * (L==0 ? 5. : 2.5), 0.)) / cell;
+    vec2 id = floor(g), f = fract(g);
+    float h = hash21(id + float(L)*37.);
+    if(h > .5){
+      vec2 c = vec2(hash21(id+7.1), hash21(id+3.3)) * .8 + .1;
+      float d = length(f - c) * cell;
+      float sz = L==0 ? .75 : 1.25;
+      float tw = .6 + .4 * sin(t * (.8 + hash21(id)*2.) + h*30.);
+      float b = smoothstep(sz, 0., d) * tw * (.35 + .65*hash21(id+9.));
+      vec3 tint = mix(vec3(.85,.9,1.), vec3(1.,.78,.58), step(.9, hash21(id+5.)));
+      col += tint * b;
+    }
+  }
+  return col;
+}
+
+vec3 nebula(vec2 q, float t){
+  vec2 l = toLocal(q) / uBH.z;
+  float au = abs(l.x), av = abs(l.y);
+  float m1 = exp(-av*av/(.8+.3*au)) * smoothstep(1.5, 3.2, au) * exp(-au*.26);
+  float m2 = exp(-l.x*l.x/(.45+.14*av)) * smoothstep(1.1, 2.1, av) * exp(-av*.42);
+  float m = m1*.9 + m2*.8;
+  vec3 col = vec3(0.);
+  if(m > .01){
+    float n = fbm(l*vec2(1.5, 2.4) + vec2(t*.03, -t*.015));
+    float dust = m * pow(n, 1.6) * 3.6;
+    col += vec3(.55,.68,1.) * dust * .30;
+    col += vec3(1.,.6,.32) * dust * .20 * smoothstep(0., 3., -l.x);
+    float sp = step(.987, hash21(floor(q/2.)));
+    col += mix(vec3(1.,.7,.4), vec3(1.), .35) * sp * m * 1.6;
+  }
+  return col;
+}
+
+vec3 sky(vec2 q, float t){ return stars(q, t) + nebula(q, t); }
+
+// bintang memanjang (efek warp) memancar dari black hole
+vec3 warp(vec2 d, float t){
+  float dist = length(d) / uBH.z;
+  if(dist < 1.4 || dist > 9.) return vec3(0.);
+  float ang = atan(d.y, d.x);
+  vec3 col = vec3(0.);
+  for(int L=0; L<2; L++){
+    float N = L==0 ? 90. : 150.;
+    float a = ang / TAU * N;
+    float id = floor(a);
+    float h1 = hash21(vec2(id, float(L)*13.7));
+    float h2 = hash21(vec2(id, float(L)*5.1+2.));
+    float h3 = hash21(vec2(id, float(L)*9.7+8.));
+    float cs = cos(2.*(ang - uTheta));
+    float dens = .22 + .78 * pow(cs*cs, 1.4);
+    if(h1 > dens) continue;
+    float p = fract(t * (.06 + .12*h2) + h3);
+    float rad = 1.5 + pow(p, 1.6) * 7.2;
+    float len = (.2 + 1.0*p) * (.5 + h2);
+    if(dist > rad || dist < rad - len) continue;
+    float tail = clamp((dist - (rad - len)) / len, 0., 1.);
+    float angI = (id + .15 + .7*h2) / N * TAU;
+    float perp = abs(sin(ang - angI)) * dist * uBH.z;
+    float wid = .45 + .55*h1;
+    float line = smoothstep(wid + .7, 0., perp);
+    float br = tail * sin(p * PI) * line * (.5 + .7*h2);
+    vec3 tint = h1 < .12 ? vec3(1.,.72,.5) : vec3(.88,.93,1.);
+    col += tint * br;
+  }
+  return col;
+}
+
+// cahaya cakram akresi pada titik hp (bidang y=0), dilihat dari arah sinar rv
+vec3 diskColor(vec3 hp, vec3 rv, float fp, float t){
+  float rr = length(hp.xz);
+  float x = (rr - RIN) / (ROUT - RIN);
+  if(x < 0. || x > 1.) return vec3(0.);
+  float ang = atan(hp.z, hp.x) / TAU;
+  float om = 2.4 / (rr * sqrt(rr));
+  float aa1 = 1. - smoothstep(.25, .7, fp * 26. / TAU);
+  float aa2 = 1. - smoothstep(.25, .7, fp * 70. / TAU);
+  float n = pfbm(vec2(ang * 24. - om * t * 3.0, rr * 3.), 24.);
+  float rings = .5 + .5 * sin(rr * 26. + n * 6.);
+  rings = mix(.6, pow(rings, 1.4), aa1);
+  float fine = mix(.7, .65 + .35 * sin(rr * 70. + n * 10.), aa2);
+  float dash = smoothstep(.2, .72, pfbm(vec2(ang * 48. - om * t * 6., rr * 13.), 48.));
+  float I = (.3 + .7 * rings) * fine * (.4 + .6 * dash);
+  float fall = pow(1. - x, 2.0);
+  float inner = 1. + 3.2 * exp(-x * 22.);
+  float edge = smoothstep(0., .03, x);
+  // efek doppler: sisi yang mendekat terang & putih keperakan, sisi yang menjauh lebih redup & tembaga
+  vec3 vd = normalize(vec3(hp.z, 0., -hp.x));
+  float dop = dot(vd, -normalize(rv));
+  float beta = .55 * sqrt(RIN / rr);
+  float beam = clamp(pow(clamp(1. + beta * dop * 1.5, .15, 2.2), 3.), .12, 4.);
+  float warm = smoothstep(.2, -.55, dop * beta * 2.);
+  vec3 silver = vec3(.93, .96, 1.);
+  vec3 copper = vec3(1., .62, .33);
+  vec3 c = mix(silver, copper, warm * (.55 + .45 * (1. - x)));
+  return c * I * fall * inner * edge * beam * 1.35;
+}
+
+void main(){
+  float t = uT;
+  vec2 q = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uDpr;   // css px, y ke bawah
+  vec2 d = vec2(q.x - uBH.x, -(q.y - uBH.y));                       // y ke atas, pusat di black hole
+  float r = uBH.z;
+  vec2 pl = toLocal(q);
+  vec2 l = pl / r;
+  float dl = length(d) / r;
+
+  vec3 col = vec3(0.);
+  vec3 bg;
+  float shadow = 0.;
+
+  bool trace = dl < 3.3 || (abs(l.x) < 4.9 && abs(l.y) < 1.2);
+
+  if(trace){
+    // ===== ray tracing relativistik (geodesik Schwarzschild, pendekatan percepatan) =====
+    float sc = 2.6 / r;                       // satuan Rs per px
+    vec2 o = pl * sc;
+    float se = sin(uElev), ce = cos(uElev);
+    vec3 cam = CAMD * vec3(0., se, -ce);
+    vec3 fwd = vec3(0., -se, ce);
+    vec3 rgt = vec3(1., 0., 0.);
+    vec3 upv = vec3(0., ce, se);
+    vec3 pos = cam + rgt * o.x + upv * o.y;
+    vec3 vel = fwd;
+    vec3 hv = cross(pos, vel);
+    float h2 = dot(hv, hv);
+    float T = 1.;
+    float rmin = 1e3;
+    bool hit = false, esc = false;
+    for(int i = 0; i < MAXIT; i++){
+      if(i >= uIter) break;
+      float rd = length(pos);
+      rmin = min(rmin, rd);
+      if(rd < 1.0){ hit = true; break; }
+      if(rd > CAMD * 1.05 && dot(pos, vel) > 0.){ esc = true; break; }
+      float dt = clamp(.065 * rd, .02, 2.2);
+      vec3 acc = -1.5 * h2 * pos / (rd*rd*rd*rd*rd);
+      vel = normalize(vel + acc * dt);
+      vec3 np = pos + vel * dt;
+      if(pos.y * np.y < 0.){
+        float f = pos.y / (pos.y - np.y);
+        vec3 hp = mix(pos, np, f);
+        float fp = sc / max(abs(vel.y), .06);
+        vec3 dc = diskColor(hp, vel, fp, t);
+        col += dc * T;
+        T *= .42;
+      }
+      pos = np;
+    }
+    if(!hit){
+      if(!esc) { col += vec3(.8,.88,1.) * .5 * T; }          // orbit foton (hampir tertangkap)
+      else {
+        col += vec3(.9,.95,1.) * exp(-(rmin - 1.5) * 16.) * .7 * T;   // cincin foton
+      }
+    }
+    if(hit) shadow = 1.;
+    // posisi langit yang terlihat (lensa gravitasi menggeser bintang)
+    vec2 dl2 = vec2(dot(vel, rgt), dot(vel, upv));
+    float cth = cos(uTheta), sth = sin(uTheta);
+    vec2 offG = vec2(dl2.x * cth - dl2.y * sth, dl2.x * sth + dl2.y * cth) * (5. / sc);
+    vec2 qb = q + vec2(offG.x, -offG.y);
+    bg = hit ? vec3(0.) : sky(qb, t) * T;
+  } else {
+    // lensa lemah di luar area ray tracing
+    float len = max(length(d), 1.);
+    vec2 off = -d / len * (1.48 * r * r / len);
+    bg = sky(q + vec2(off.x, -off.y), t);
+  }
+
+  // ===== elemen sinematik: cahaya, garis tegak lurus cakram, kabut, bintang warp =====
+  float outside = smoothstep(.97, 1.12, dl);
+  float flick = .8 + .2 * sin(t * 2.3) * sin(t * .7 + 1.);
+  vec2 L = l;
+  float aL = abs(L.y);
+  float spike = (exp(-abs(L.x) * 46.) * .95 + exp(-abs(L.x) * 8.) * .13) * exp(-aL * .5) * smoothstep(.8, 1.5, aL) * smoothstep(5.5, 1.2, aL);
+  spike *= flick;
+  float spike2 = exp(-abs(L.x) * 110.) * smoothstep(.9, 1.6, aL) * exp(-aL * .22) * .5;
+  vec3 extra = vec3(.9, .95, 1.) * (spike + spike2);
+  float haze = exp(-L.y * L.y * 8.) * exp(-abs(L.x) * .32) * .10 + exp(-L.y * L.y * 90.) * exp(-abs(L.x) * .5) * .12;
+  extra += vec3(.6, .72, 1.) * haze;
+  extra += vec3(.62, .74, 1.) * .05 * exp(-(dl - 1.) * 1.8);
+  extra += vec3(.9, .95, 1.) * .10 * exp(-(dl - 1.) * 8.);
+  col += extra * outside;
+  col += warp(d, t) * (1. - shadow);
+  col += bg;
+
+  // tone mapping ala film + sedikit vignette
+  col = 1. - exp(-col * 1.25);
+  col = pow(col, vec3(.92));
+  gl_FragColor = vec4(col, 1.);
+}`;
+
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+  const vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+  if (!vs || !fs) return;
+  const pg = gl.createProgram();
+  gl.attachShader(pg, vs); gl.attachShader(pg, fs); gl.linkProgram(pg);
+  if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) { console.warn(gl.getProgramInfoLog(pg)); return; }
+  gl.useProgram(pg);
+  window.__bhGL = true;
+  document.body.insertBefore(cv, document.body.firstChild);
+  document.body.classList.add("gl-bg");
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pg, "a");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {};
+  ["uRes", "uDpr", "uT", "uBH", "uTheta", "uElev", "uIter"].forEach(n => U[n] = gl.getUniformLocation(pg, n));
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, dpr = 1, maxDpr = 1, t = reduce ? 4 : 0, last = 0, raf = 0;
+  const bh = { x: 0, y: 0, r: 0 };
+  let small = false;
+  let px = 0, py = 0, tpx = 0, tpy = 0; // parallax pointer
+
+  function build() {
+    W = cv.clientWidth || window.innerWidth; H = cv.clientHeight || window.innerHeight;
+    if (!W || !H) return;
+    small = W < 700;
+    maxDpr = Math.min(window.devicePixelRatio || 1, small ? 1.25 : 1.5);
+    if (dpr > maxDpr || !dpr) dpr = maxDpr;
+    if (small) {
+      bh.r = Math.max(46, W * 0.14);
+      bh.x = W * 0.7;
+      bh.y = Math.max(bh.r * 2.7, H * 0.2);
+    } else {
+      bh.r = Math.min(165, Math.max(95, Math.min(W * 0.108, H * 0.2)));
+      bh.x = W * (W < 1000 ? 0.72 : 0.68);
+      bh.y = Math.max(bh.r * 2.6, H * 0.42);
+    }
+    applySize();
+  }
+  function applySize() {
+    cv.width = Math.max(2, Math.round(W * dpr));
+    cv.height = Math.max(2, Math.round(H * dpr));
+    gl.viewport(0, 0, cv.width, cv.height);
+  }
+
+  function draw() {
+    if (!W) return;
+    const theta = 0.8 + 0.025 * Math.sin(t * 0.3);
+    const elev = 0.085 + 0.035 * Math.sin(t * 0.33) + 0.02 * Math.sin(t * 0.81 + 1) + py * 0.05;
+    const wob = Math.sin(t * 0.35);
+    gl.uniform2f(U.uRes, cv.width, cv.height);
+    gl.uniform1f(U.uDpr, dpr);
+    gl.uniform1f(U.uT, t);
+    const sy = window.scrollY || 0;           // parallax: black hole bergeser pelan saat scroll
+    gl.uniform3f(U.uBH, bh.x + wob * 5 + px * 10, bh.y - Math.min(sy, 1500) * 0.22 + Math.cos(t * 0.27) * 4, bh.r * (1 + 0.01 * Math.sin(t * 0.6)));
+    gl.uniform1f(U.uTheta, theta + px * 0.04);
+    gl.uniform1f(U.uElev, elev);
+    gl.uniform1i(U.uIter, small ? 95 : 125);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // kualitas otomatis: kalau device berat, resolusi diturunkan pelan-pelan
+  let acc = 0, frames = 0;
+  function loop(ts) {
+    const dtms = ts - last; last = ts;
+    const dt = Math.min(0.05, dtms / 1000 || 0);
+    t += dt;
+    px += (tpx - px) * 0.04; py += (tpy - py) * 0.04;
+    draw();
+    if (dtms > 0 && dtms < 500) { acc += dtms; frames++; }
+    if (frames >= 40) {
+      const avg = acc / frames; acc = 0; frames = 0;
+      if (avg > 26 && dpr > 0.55) { dpr = Math.max(0.55, dpr * 0.8); applySize(); }
+      else if (avg < 15 && dpr < maxDpr) { dpr = Math.min(maxDpr, dpr * 1.15); applySize(); }
+    }
+    raf = requestAnimationFrame(loop);
+  }
+  function start() { if (reduce || raf || !W) return; last = performance.now(); raf = requestAnimationFrame(loop); }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+  let visible = true;
+  function sync() { if (visible && !document.hidden) start(); else stop(); }
+
+  let rt = 0;
+  new ResizeObserver(() => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { build(); if (W) { draw(); sync(); } }, 80);
+  }).observe(cv);
+  document.addEventListener("visibilitychange", sync);
+
+  // parallax halus mengikuti kursor / sentuhan -> sudut pandang 3D bergeser
+  if (!reduce) {
+    window.addEventListener("pointermove", e => {
+      tpx = (e.clientX / (W || window.innerWidth) - 0.5) * 2;
+      tpy = Math.max(-1, Math.min(1, (e.clientY - bh.y) / 400));
+    }, { passive: true });
+    document.addEventListener("pointerleave", () => { tpx = 0; tpy = 0; });
+  }
+
+  cv.addEventListener("webglcontextlost", e => { e.preventDefault(); stop(); });
+  cv.addEventListener("webglcontextrestored", () => location.reload());
+
+  window.__bhTest = { setT: v => { t = v; draw(); }, stop };
+  build();
+  if (W) draw();
+})();
+
+  </script>
+
+  <script>
+    /* ===== Background hero: black hole, nebula & bintang (canvas) ===== */
+    (function () {
+      const hero = document.getElementById("beranda");
+      const cv = document.getElementById("spaceBg");
+      if (!hero || !cv) return;
+      if (window.__bhGL) return; // WebGL 3D aktif -> versi 2D ini jadi cadangan saja
+
+      const ctx = cv.getContext("2d");
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const TAU = Math.PI * 2;
+
+      let W = 0, H = 0, dpr = 1, t = 0, last = 0, raf = 0;
+      let stars = [], parts = [], rings = [], warp = [], neb = null, shoot = null, nextShoot = 4;
+      const bh = { x: 0, y: 0, r: 0 };
+
+      function rng(seed) {
+        return function () {
+          seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+          let x = Math.imul(seed ^ seed >>> 15, 1 | seed);
+          x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+          return ((x ^ x >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      function build() {
+        W = hero.clientWidth; H = hero.clientHeight;
+        if (!W || !H) return;
+        dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const small = W < 700;
+        if (small) {
+          bh.r = Math.max(40, W * 0.12);
+          bh.x = W * 0.8;
+          bh.y = 100;
+        } else {
+          bh.r = Math.min(150, Math.max(90, W * 0.105));
+          // turun sampai bagian bawahnya tertutup daftar game
+          const gl = document.getElementById("gameList");
+          const top = gl && gl.offsetTop > 200 ? gl.offsetTop : 480;
+          bh.x = W * (W < 1000 ? 0.76 : 0.72);
+          bh.y = Math.max(bh.r * 2.2, top - bh.r * 0.8);
+        }
+
+        // bintang
+        const r = rng(7);
+        const n = Math.max(70, Math.min(320, Math.round(W * H / 4500)));
+        stars = [];
+        for (let i = 0; i < n; i++) {
+          const big = r() > 0.94;
+          stars.push({
+            x: r() * W, y: r() * H,
+            r: big ? 1.1 + r() * 0.8 : 0.3 + Math.pow(r(), 3) * 0.9,
+            a: 0.35 + r() * 0.65,
+            sp: 0.5 + r() * 1.8, ph: r() * TAU,
+            vx: -(2 + r() * 5)
+          });
+        }
+
+        // partikel yang mengorbit black hole (cakram akresi)
+        const pr = rng(33);
+        parts = [];
+        for (let i = 0; i < 240; i++) {
+          parts.push({ a0: pr() * TAU, off: pr(), sp: 0.7 + pr() * 0.8, sz: 0.5 + pr() * 1.3 });
+        }
+        // lapisan gas cakram (garis putus-putus yang berputar)
+        const rr = rng(55);
+        rings = [];
+        for (let i = 0; i < 28; i++) {
+          rings.push({ k: i / 27, d: 0.3 + rr() * 1.2, g: 0.1 + rr() * 0.5,
+                       w: 0.006 + rr() * 0.028, al: 0.3 + rr() * 0.55 });
+        }
+
+        // bintang memanjang (efek warp) yang memancar dari black hole
+        const wr = rng(77);
+        warp = [];
+        const nW = small ? 90 : 150;
+        for (let i = 0; i < nW; i++) {
+          const a = wr() < 0.55 ? (wr() < 0.5 ? 0 : Math.PI) + (wr() - 0.5) * 0.9 : wr() * TAU;
+          warp.push({ a, off: wr(), sp: 0.12 + wr() * 0.18, len: 0.5 + wr() * 1.4,
+                      c: wr() < 0.2 ? 1 : 0, w: 0.5 + wr() * 1.1 });
+        }
+
+        // kabut nebula (digambar sekali, lalu digeser pelan tiap frame)
+        const Hn = Math.min(H, 780);
+        neb = document.createElement("canvas");
+        neb.width = W; neb.height = Hn;
+        const nc = neb.getContext("2d");
+        nc.globalCompositeOperation = "lighter";
+        const q = rng(21);
+        function blob(x, y, rad, al) {
+          const g = nc.createRadialGradient(x, y, 0, x, y, rad);
+          g.addColorStop(0, "rgba(255,255,255," + al + ")");
+          g.addColorStop(1, "rgba(255,255,255,0)");
+          nc.fillStyle = g;
+          nc.beginPath(); nc.arc(x, y, rad, 0, TAU); nc.fill();
+        }
+        // asap tipis di atas black hole
+        for (let i = 0; i < 46; i++) {
+          blob(bh.x + bh.r * (0.2 + q() * 0.9) + (q() - .5) * 40,
+               bh.y - bh.r * (0.9 + q() * 1.2) + (q() - .5) * 40,
+               10 + q() * 32, 0.025 + q() * 0.05);
+        }
+        // aliran kabut turun ke kanan bawah
+        for (let i = 0; i < 280; i++) {
+          const u = q();
+          const x = bh.x - bh.r + u * W * 0.2 + Math.sin(u * 7) * 55 + (q() - .5) * 90;
+          const y = bh.y + bh.r * 1.2 + u * (Hn - bh.y - bh.r * 1.6) + (q() - .5) * 60;
+          blob(x, y, 8 + q() * 46, 0.012 + q() * 0.045);
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // nebula
+        if (neb) {
+          ctx.globalAlpha = 0.8 + 0.2 * Math.sin(t * 0.4);
+          ctx.drawImage(neb, Math.sin(t * 0.12) * 10, Math.cos(t * 0.09) * 6);
+          ctx.globalAlpha = 1;
+        }
+
+        // bintang berkelip
+        for (const s of stars) {
+          const a = s.a * (0.55 + 0.45 * Math.sin(t * s.sp + s.ph));
+          ctx.globalAlpha = a;
+          ctx.fillStyle = "#fff";
+          const x = ((s.x + s.vx * t) % W + W) % W;
+          ctx.beginPath(); ctx.arc(x, s.y, s.r, 0, TAU); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // bintang jatuh sesekali
+        if (!reduce && !shoot && t > nextShoot) {
+          shoot = { x: W * (0.35 + Math.random() * 0.65), y: Math.random() * Math.min(H, 400) * 0.6, age: 0 };
+        }
+        if (shoot) {
+          shoot.age += 0.016;
+          const k = shoot.age / 0.9;
+          if (k >= 1) { shoot = null; nextShoot = t + 7 + Math.random() * 8; }
+          else {
+            const hx = shoot.x - 420 * shoot.age, hy = shoot.y + 220 * shoot.age;
+            const g = ctx.createLinearGradient(hx, hy, hx + 90, hy - 47);
+            g.addColorStop(0, "rgba(255,255,255," + (0.9 * (1 - k)) + ")");
+            g.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.strokeStyle = g; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 90, hy - 47); ctx.stroke();
+          }
+        }
+
+        // ===== black hole 3D (cakram miring diagonal, gaya perak-biru) =====
+        const x = bh.x + Math.sin(t * 0.35) * 8;
+        const y = bh.y + Math.cos(t * 0.27) * 6;
+        const r = bh.r * (1 + 0.012 * Math.sin(t * 0.6));
+        const tilt = -0.8 + 0.03 * Math.sin(t * 0.3);    // cakram miring ~45° (kiri bawah -> kanan atas)
+        const sq = 0.2 + 0.02 * Math.sin(t * 0.4);       // tipis, terlihat dari samping
+        const IN = 1.1, OUT = 3.3;
+        const nx = -Math.sin(tilt), ny = Math.cos(tilt); // arah tegak lurus cakram
+
+        // 1. cahaya luar (putih kebiruan)
+        ctx.globalAlpha = 0.85 + 0.15 * Math.sin(t * 0.9);
+        let g = ctx.createRadialGradient(x, y, r * 0.9, x, y, r * 3.6);
+        g.addColorStop(0, "rgba(215,228,255,.45)");
+        g.addColorStop(0.12, "rgba(170,195,245,.18)");
+        g.addColorStop(0.4, "rgba(120,150,220,.06)");
+        g.addColorStop(1, "rgba(100,130,210,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r * 3.6, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // 2. kabut biru memanjang di sepanjang cakram + garis cahaya tegak lurus
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.translate(x, y); ctx.rotate(tilt);
+        ctx.save(); ctx.scale(1, 0.17);
+        let hz = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 7.5);
+        hz.addColorStop(0, "rgba(200,215,255,.34)");
+        hz.addColorStop(0.25, "rgba(120,150,215,.15)");
+        hz.addColorStop(1, "rgba(80,110,190,0)");
+        ctx.fillStyle = hz; ctx.beginPath(); ctx.arc(0, 0, r * 7.5, 0, TAU); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.scale(1, 0.05);
+        let hz2 = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 10);
+        hz2.addColorStop(0, "rgba(235,242,255,.4)");
+        hz2.addColorStop(0.3, "rgba(150,175,230,.14)");
+        hz2.addColorStop(1, "rgba(100,130,210,0)");
+        ctx.fillStyle = hz2; ctx.beginPath(); ctx.arc(0, 0, r * 10, 0, TAU); ctx.fill();
+        ctx.restore();
+        ctx.restore();
+
+        const flick = 0.75 + 0.25 * Math.sin(t * 2.3);
+        const sL = r * 6;
+        ctx.globalCompositeOperation = "lighter";
+        for (const sp of [[7, 0.05], [1.6, 0.6 * flick]]) {
+          const lg = ctx.createLinearGradient(x - nx * sL, y - ny * sL, x + nx * sL, y + ny * sL);
+          lg.addColorStop(0, "rgba(255,255,255,0)");
+          lg.addColorStop(0.5, "rgba(255,255,255," + sp[1] + ")");
+          lg.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.strokeStyle = lg; ctx.lineWidth = sp[0];
+          ctx.beginPath();
+          ctx.moveTo(x - nx * sL, y - ny * sL); ctx.lineTo(x + nx * sL, y + ny * sL);
+          ctx.stroke();
+        }
+
+        // 3. bintang memanjang memancar keluar
+        const D = Math.max(W, H) * 0.65, sc = r / 130;
+        ctx.lineCap = "round";
+        for (const w of warp) {
+          const p = (t * w.sp + w.off) % 1;
+          const d = r * 1.5 + Math.pow(p, 1.7) * D;
+          const L = (6 + p * 60 * w.len) * sc;
+          const ang = w.a + tilt;
+          const ca = Math.cos(ang), sa = Math.sin(ang);
+          const ex = x + ca * d, ey = y + sa * d;
+          const fx = Math.max(0, Math.min(1, (ex - W * 0.22) / (W * 0.28)));
+          const al = Math.sin(p * Math.PI) * 0.75 * fx;
+          if (al < 0.02) continue;
+          ctx.globalAlpha = al;
+          ctx.strokeStyle = w.c ? "rgb(240,180,125)" : "rgb(225,235,255)";
+          ctx.lineWidth = w.w;
+          ctx.beginPath();
+          ctx.moveTo(x + ca * (d - L), y + sa * (d - L)); ctx.lineTo(ex, ey);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineCap = "butt";
+        ctx.globalCompositeOperation = "source-over";
+
+        // cakram akresi (separuh belakang / separuh depan bola)
+        function disc(front) {
+          ctx.save();
+          ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(1, sq);
+          ctx.beginPath();
+          if (front) ctx.rect(-5 * r, 0, 10 * r, 5 * r); else ctx.rect(-5 * r, -5 * r, 10 * r, 5 * r);
+          ctx.clip();
+
+          // gradien dimulai dari titik pusat & transparan sampai tepi dalam cakram
+          const f0 = IN * 0.92 / OUT, fs = 1 - f0;
+          const bg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * OUT);
+          bg.addColorStop(0, "rgba(255,255,255,0)");
+          bg.addColorStop(f0, "rgba(255,255,255,0)");
+          bg.addColorStop(f0 + 0.02, "rgba(255,255,255,.9)");
+          bg.addColorStop(f0 + fs * 0.14, "rgba(225,235,255,.6)");
+          bg.addColorStop(f0 + fs * 0.4, "rgba(150,175,225,.22)");
+          bg.addColorStop(1, "rgba(110,140,210,0)");
+          ctx.fillStyle = bg;
+          ctx.beginPath(); ctx.arc(0, 0, r * OUT, 0, TAU); ctx.fill();
+
+          // gas berputar: sisi kiri bawah berwarna tembaga, sisi lain putih keperakan
+          ctx.globalCompositeOperation = "lighter";
+          const dg = ctx.createLinearGradient(-r * OUT, 0, r * OUT, 0);
+          dg.addColorStop(0, "rgba(235,165,105,.8)");
+          dg.addColorStop(0.35, "rgba(245,248,255,.95)");
+          dg.addColorStop(0.65, "rgba(255,255,255,.9)");
+          dg.addColorStop(1, "rgba(200,215,245,.5)");
+          ctx.strokeStyle = dg;
+          for (const rg of rings) {
+            const rad = r * (IN + (OUT - IN) * rg.k);
+            ctx.globalAlpha = rg.al * (1 - rg.k * 0.5);
+            ctx.lineWidth = r * rg.w;
+            ctx.setLineDash([rg.d * r, rg.g * r]);
+            ctx.lineDashOffset = -t * r * 0.5 / Math.pow(1 + rg.k * 1.5, 1.5);
+            ctx.beginPath(); ctx.arc(0, 0, rad, 0, TAU); ctx.stroke();
+          }
+          ctx.setLineDash([]);
+
+          // garis tepi cakram yang tajam & terang
+          ctx.strokeStyle = "rgb(255,255,255)";
+          for (const e of [[1.18, 0.07, 0.22], [1.18, 0.018, 0.95], [1.62, 0.05, 0.14], [1.62, 0.012, 0.7]]) {
+            ctx.globalAlpha = e[2];
+            ctx.lineWidth = r * e[1];
+            ctx.beginPath(); ctx.arc(0, 0, r * e[0], 0, TAU); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        }
+
+        // partikel di bidang cakram
+        const ct = Math.cos(tilt), st = Math.sin(tilt);
+        function orbit(front) {
+          for (const q of parts) {
+            const p = (t * 0.04 + q.off) % 1;
+            const rad = OUT + 0.15 - p * (OUT + 0.15 - IN + 0.05);
+            const ang = q.a0 + t * q.sp * 1.1 / Math.pow(rad, 1.5);
+            const lx = Math.cos(ang) * rad * r, ly = Math.sin(ang) * rad * r * sq;
+            if ((ly > 0) !== front) continue;
+            const px = x + lx * ct - ly * st, py = y + lx * st + ly * ct;
+            const dop = 0.6 + 0.4 * -Math.cos(ang);
+            ctx.globalAlpha = Math.sin(p * Math.PI) * 0.9 * dop;
+            ctx.fillStyle = q.sz > 1.2 ? "rgb(235,170,110)" : "rgb(240,245,255)";
+            ctx.beginPath(); ctx.arc(px, py, q.sz * (0.7 + r / 260), 0, TAU); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        // 4. cakram belakang + partikel belakang
+        disc(false);
+        orbit(false);
+
+        // 5. cincin konsentris (cahaya melengkung), paling terang searah cakram
+        function conic(rgb, peak) {
+          if (!ctx.createConicGradient) return "rgba(" + rgb + ",.8)";
+          const cg = ctx.createConicGradient(0, x, y);
+          const hot = (t * 0.1) % 1;
+          for (let k = 0; k <= 32; k++) {
+            const f = k / 32;
+            let d = Math.abs(f - hot); d = Math.min(d, 1 - d);
+            const c = Math.abs(Math.cos(f * TAU - tilt));
+            const al = 0.28 + 0.72 * Math.pow(c, 2.5) + peak * Math.exp(-d * d / 0.01);
+            cg.addColorStop(f, "rgba(" + rgb + "," + Math.min(1, al) + ")");
+          }
+          return cg;
+        }
+        const silver = conic("240,246,255", 0.3);
+        const copper = conic("240,175,115", 0.3);
+        for (let i = 0; i < 16; i++) {
+          const f = i / 15;
+          const rad = r * (1.07 + f * 0.85);
+          const off = f * r * 0.1;
+          ctx.globalAlpha = (0.8 * (1 - f) + 0.12) * (0.75 + 0.25 * Math.sin(t * 1.1 + i * 0.8));
+          ctx.lineWidth = r * (0.028 * (1 - f) + 0.008);
+          ctx.strokeStyle = i % 4 === 2 ? copper : silver;
+          ctx.setLineDash([r * (1.5 + f * 2), r * (0.4 + f)]);
+          ctx.lineDashOffset = -t * r * (0.4 - 0.3 * f) * (i % 2 ? 1 : -1);
+          ctx.beginPath(); ctx.arc(x + nx * off, y + ny * off, rad, 0, TAU); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        // cincin foton (tepi bola) dengan bloom
+        const layers = [[0.04, 0.95, "255,255,255"], [0.10, 0.38, "225,235,255"],
+                        [0.22, 0.15, "170,195,240"], [0.40, 0.07, "140,165,220"]];
+        for (const L of layers) {
+          ctx.globalAlpha = L[1];
+          ctx.strokeStyle = conic(L[2], 0.45);
+          ctx.lineWidth = r * L[0];
+          ctx.beginPath(); ctx.arc(x, y, r * 1.03, 0, TAU); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        // 6. bola hitam + sedikit cahaya di tepinya biar terasa bulat
+        ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+        const rim = ctx.createRadialGradient(x, y, r * 0.82, x, y, r);
+        rim.addColorStop(0, "rgba(200,220,255,0)");
+        rim.addColorStop(1, "rgba(200,220,255,.12)");
+        ctx.fillStyle = rim;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+
+        // 7. cakram depan (lewat di depan bola) + partikel depan
+        disc(true);
+        orbit(true);
+      }
+
+      function loop(ts) {
+        const dt = Math.min(0.05, (ts - last) / 1000 || 0);
+        last = ts; t += dt;
+        draw();
+        raf = requestAnimationFrame(loop);
+      }
+
+      function start() {
+        if (reduce || raf || !W) return;
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+      }
+      function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+      let visible = false;
+      function sync() {
+        if (visible && !document.hidden) start(); else stop();
+      }
+
+      let rt = 0;
+      new ResizeObserver(() => {
+        clearTimeout(rt);
+        rt = setTimeout(() => { build(); if (W) { draw(); sync(); } }, 80);
+      }).observe(hero);
+
+      // animasi cuma jalan saat Home tampil & tab aktif (hemat baterai)
+      new IntersectionObserver(es => { visible = es[0].isIntersecting; sync(); }).observe(hero);
+      document.addEventListener("visibilitychange", sync);
+
+      build();
+      if (W) draw();
+    })();
+  </script>
 </body>
 
 </html>
