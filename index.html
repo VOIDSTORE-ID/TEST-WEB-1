@@ -1177,7 +1177,7 @@
     "use strict";
 
     /* ===== Konfigurasi & data ===== */
-    const ADMIN_WA = "6285813172078";
+    const ADMIN_WA = "628136335660";
 
     /* ===== Akun pembayaran (ISI DENGAN DATA ASLI) =====
        - Kosongkan "number" / "image" kalau belum siap: customer akan diminta menunggu detail dari admin via WhatsApp.
@@ -1185,9 +1185,9 @@
        - Pastikan nama & nomor sama persis dengan akun aslimu. */
     const PAYMENT_ACCOUNTS = {
       "QRIS":          { type: "qris",    image: "", note: "Scan dengan aplikasi e-wallet atau mobile banking apa pun." },
-      "DANA":          { type: "ewallet", name: "", number: "085813172078" },
-      "GoPay":         { type: "ewallet", name: "", number: "085813172078" },
-      "OVO":           { type: "ewallet", name: "", number: "085813172078" },
+      "DANA":          { type: "ewallet", name: "", number: "08136335660" },
+      "GoPay":         { type: "ewallet", name: "", number: "08136335660" },
+      "OVO":           { type: "ewallet", name: "", number: "08136335660" },
       "Transfer Bank": { type: "bank",    bank: "", name: "", number: "" }
     };
 
@@ -2273,6 +2273,8 @@ uniform int uIter;
 uniform vec3 uPtr;      // kursor / sentuhan: x, y (css px), kekuatan 0..1
 uniform vec4 uPulse;    // gelombang saat klik / tap: x, y, umur (detik), amplitudo
 uniform float uBoost;   // cakram makin terang & cepat kalau kursor dekat
+uniform float uDiskT;   // waktu putar cakram (ikut berubah saat di-flick)
+uniform float uStarT;   // waktu putar bintang yang berpusar
 
 const float PI = 3.14159265;
 const float TAU = 6.2831853;
@@ -2351,26 +2353,32 @@ vec2 lensP(vec2 q){
   }
   if(uPulse.w > .001){
     vec2 dd = q - uPulse.xy; float len = length(dd) + .001;
-    float rr = uPulse.z * 520.;
-    float k = exp(-pow((len - rr) / 42., 2.)) * uPulse.w;
-    off -= dd / len * k * 30.;
+    float e = smoothstep(0., .12, uPulse.z) * uPulse.w;
+    float rs = 19. * e;
+    off -= dd / len * (rs * rs * 3.5) / max(len, rs * 1.1 + .001) * exp(-len / (rs * 7. + 1.));
   }
   return off;
 }
-vec3 ptrGlow(vec2 q){
-  vec3 c = vec3(0.);
-  if(uPtr.z > .001){
-    float len = length(q - uPtr.xy); float R = lensR();
-    c += vec3(.62, .74, 1.) * uPtr.z * (.16 * exp(-pow((len - R * .5) / (R * .08), 2.)) + .07 * exp(-len * len / (R * R * .22)));
-  }
-  if(uPulse.w > .001){
-    float len = length(q - uPulse.xy); float rr = uPulse.z * 520.;
-    c += vec3(.85, .92, 1.) * uPulse.w * .45 * exp(-pow((len - rr) / 14., 2.));
-  }
-  return c;
+// cincin putih di kursor / tap dihilangkan; efek lensa & riak bintang tetap jalan lewat lensP()
+vec3 ptrGlow(vec2 q){ return vec3(0.); }
+
+// klik / tap = black hole mini: bayangan hitam + cincin foton oranye-putih, lalu menyusut hilang
+vec3 miniBH(vec2 q, vec3 col){
+  if(uPulse.w < .001) return col;
+  vec2 dd = q - uPulse.xy; float len = length(dd);
+  float e = smoothstep(0., .12, uPulse.z) * uPulse.w;
+  float rs = 19. * e + .001;
+  float side = .5 + .5 * dot(normalize(dd + vec2(1e-4)), normalize(vec2(-.6, .8)));
+  vec3 rc = mix(vec3(1., .6, .26), vec3(.92, .96, 1.), side);
+  float ring = exp(-pow((len - rs * 1.45) / (rs * .2 + .4), 2.));
+  col += rc * ring * e * (.5 + 1.1 * side);
+  col += vec3(.7, .8, 1.) * exp(-len / (rs * 2.8)) * .05 * e;
+  col *= 1. - e * smoothstep(rs * 1.05, rs * .8, len);
+  return col;
 }
 
 vec3 sky(vec2 q, float t){ return stars(q, t) + nebula(q, t); }
+float uTime2(float id, float band){ return uT * (.8 + hash21(vec2(id, band + 1.)) * 1.6) + id * 3.7; }
 
 // bintang memanjang (efek warp) memancar dari black hole
 vec3 warp(vec2 d, float t){
@@ -2402,6 +2410,36 @@ vec3 warp(vec2 d, float t){
     col += tint * br;
   }
   return col;
+}
+
+// bintang yang ikut berpusar pelan mengelilingi black hole, searah putaran cakram
+// (makin dekat ke pusat makin cepat; tiap bintang mengorbit, jadi tidak ada distorsi yang menumpuk)
+vec3 swirlStars(vec2 d){
+  float r = uBH.z;
+  float rho = length(d) / r;
+  if(rho < 1.5 || rho > 8.) return vec3(0.);
+  float ang = atan(d.y, d.x);
+  float band = floor((rho - 1.5) / .42);
+  float rb = 1.5 + (band + .5) * .42;
+  float N = floor(rb * r * TAU / 34.);
+  float om = .55 / (rb * sqrt(rb));
+  float a = ang - om * uStarT;               // bintang bergerak ke arah +sudut (searah cakram)
+  float u = fract(a / TAU) * N;
+  float id = floor(u);
+  float h = hash21(vec2(id, band));
+  if(h > .55) return vec3(0.);
+  float ca = hash21(vec2(id + 11., band + 3.)) * .7 + .15;
+  float cr = hash21(vec2(id + 5., band + 17.)) * .7 + .15;
+  float sa = (id + ca) / N * TAU;
+  float rs = (1.5 + (band + cr) * .42) * r;
+  vec2 ps = rs * vec2(cos(sa), sin(sa));
+  vec2 pp = rho * r * vec2(cos(a), sin(a));
+  float dist = length(pp - ps);
+  float tw = .65 + .35 * sin(uTime2(id, band));
+  float b = smoothstep(1.5, 0., dist) * tw * (.45 + .55 * hash21(vec2(id + 9., band)));
+  float edge = smoothstep(1.5, 1.9, rho) * smoothstep(8., 6., rho);
+  vec3 tint = mix(vec3(.85, .92, 1.), vec3(1., .74, .5), step(.82, hash21(vec2(id, band + 7.))));
+  return tint * b * edge * .95 * (1. + .5 * uBoost);
 }
 
 // cahaya cakram akresi pada titik hp (bidang y=0), dilihat dari arah sinar rv
@@ -2480,7 +2518,7 @@ void main(){
         float f = pos.y / (pos.y - np.y);
         vec3 hp = mix(pos, np, f);
         float fp = sc / max(abs(vel.y), .06);
-        vec3 dc = diskColor(hp, vel, fp, t);
+        vec3 dc = diskColor(hp, vel, fp, uDiskT);
         col += dc * T * (1. + .5 * uBoost);
         T *= .42;
       }
@@ -2521,8 +2559,10 @@ void main(){
   extra += vec3(.9, .95, 1.) * .10 * exp(-(dl - 1.) * 8.);
   col += extra * outside;
   col += warp(d, t) * (1. - shadow) * (1. + .6 * uBoost);
+  col += swirlStars(d) * (1. - shadow);
   col += ptrGlow(q) * (1. - shadow);
   col += bg;
+  col = miniBH(q, col);
 
   // tone mapping ala film + sedikit vignette
   col = 1. - exp(-col * 1.25);
@@ -2554,7 +2594,7 @@ void main(){
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
   const U = {};
-  ["uRes", "uDpr", "uT", "uBH", "uTheta", "uElev", "uIter", "uPtr", "uPulse", "uBoost"].forEach(n => U[n] = gl.getUniformLocation(pg, n));
+  ["uRes", "uDpr", "uT", "uBH", "uTheta", "uElev", "uIter", "uPtr", "uPulse", "uBoost", "uDiskT", "uStarT"].forEach(n => U[n] = gl.getUniformLocation(pg, n));
 
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let W = 0, H = 0, dpr = 1, maxDpr = 1, t = reduce ? 4 : 0, last = 0, raf = 0;
@@ -2566,6 +2606,8 @@ void main(){
   const pull = { x: 0, y: 0 };
   const pulse = { x: 0, y: 0, age: 9, amp: 0 };
   let boost = 0;
+  // putaran cakram & bintang (bisa di-flick)
+  let spinW = 0, diskT = t, starT = t;
 
   function build() {
     W = cv.clientWidth || window.innerWidth; H = cv.clientHeight || window.innerHeight;
@@ -2603,6 +2645,8 @@ void main(){
     gl.uniform3f(U.uPtr, P.sx, P.sy, P.s);
     gl.uniform4f(U.uPulse, pulse.x, pulse.y, pulse.age, pulse.amp);
     gl.uniform1f(U.uBoost, boost);
+    gl.uniform1f(U.uDiskT, diskT);
+    gl.uniform1f(U.uStarT, starT);
     gl.uniform1f(U.uTheta, theta + px * 0.09);
     gl.uniform1f(U.uElev, elev);
     gl.uniform1i(U.uIter, small ? 95 : 125);
@@ -2621,10 +2665,10 @@ void main(){
     // pulse dari klik / tap
     if (pulse.amp > 0 || pulse.age < 9) {
       pulse.age += dt;
-      pulse.amp = Math.max(0, 1 - pulse.age / 1.6);
+      pulse.amp = Math.max(0, 1 - pulse.age / 1.5);
       if (pulse.amp === 0) pulse.age = 9;
     }
-    boost += (Math.min(1, prox * 1.1 + pulse.amp * 0.7) - boost) * 0.07;
+    boost += (Math.min(1, prox * 1.1 + pulse.amp * 0.7 + Math.abs(spinW) / 6) - boost) * 0.07;
     // black hole sedikit "tertarik" ke arah kursor
     const mag = Math.min(dist / (bh.r * 2), 1) * bh.r * 0.3 * prox;
     pull.x += (dx / dist * mag - pull.x) * 0.06;
@@ -2639,6 +2683,33 @@ void main(){
   }
   function firePulse(x, y) { pulse.x = x; pulse.y = y; pulse.age = 0; pulse.amp = 1; }
 
+  // posisi pusat black hole utama (sama dengan yang dipakai draw())
+  function bhCenter() {
+    const sy = window.scrollY || 0;
+    return { x: bh.x + Math.sin(t * 0.35) * 5 + px * 18 + pull.x, y: bh.y - Math.min(sy, 1500) * 0.22 + Math.cos(t * 0.27) * 4 + pull.y };
+  }
+  // flick: geser mouse / jari melewati black hole -> cakram berputar sesuai arah geseran
+  const fl = { x: 0, y: 0, ts: 0 };
+  function flick(x, y) {
+    const now = performance.now();
+    const fresh = now - fl.ts < 90;
+    const mx = x - fl.x, my = y - fl.y;
+    fl.x = x; fl.y = y; fl.ts = now;
+    if (!fresh) return;
+    if (Math.hypot(mx, my) < 1.5) return;
+    const c = bhCenter(), rx = x - c.x, ry = y - c.y, rho = Math.hypot(rx, ry);
+    if (rho > bh.r * 3.4 || rho < bh.r * 0.35) return;
+    // >0 = berlawanan jarum jam di layar = searah putaran cakram bawaan
+    const cross = ry * mx - rx * my;
+    const dw = Math.max(-1.6, Math.min(1.6, cross / rho / bh.r * 6));
+    spinW = Math.max(-5, Math.min(5, spinW + dw));
+  }
+  // halaman pesanan & menu pengaturan (titik 3) tidak pakai fitur interaktif
+  function off(e) {
+    if (window.__bhBlocked && window.__bhBlocked(e)) { P.ts = 0; fl.ts = 0; return true; }
+    return false;
+  }
+
   // kualitas otomatis: kalau device berat, resolusi diturunkan pelan-pelan
   let acc = 0, frames = 0;
   function loop(ts) {
@@ -2646,6 +2717,9 @@ void main(){
     const dt = Math.min(0.05, dtms / 1000 || 0);
     updatePointer(ts, dt);
     t += dt * (1 + 1.6 * boost);
+    diskT += dt * (1 + 1.6 * boost + spinW);   // flick: spinW menambah / membalik kecepatan cakram
+    starT += dt * (1 + 0.35 * spinW);
+    spinW *= Math.exp(-dt * 0.5);              // melambat sendiri seperti roda yang dilepas
     px += (tpx - px) * 0.07; py += (tpy - py) * 0.07;
     draw();
     if (dtms > 0 && dtms < 500) { acc += dtms; frames++; }
@@ -2672,22 +2746,28 @@ void main(){
   // interaktif: kursor mouse & sentuhan jari (lensa gravitasi, tarikan, kilau, gelombang saat tap)
   if (!reduce) {
     const opt = { passive: true };
-    window.addEventListener("pointermove", e => setPtr(e.clientX, e.clientY, e.pointerType === "touch"), opt);
+    window.addEventListener("pointermove", e => {
+      if (off(e)) return;
+      setPtr(e.clientX, e.clientY, e.pointerType === "touch");
+      flick(e.clientX, e.clientY);
+    }, opt);
+    // black hole mini saat klik sekarang digambar di kanvas ATAS (script #bhFx), bukan di belakang konten
     window.addEventListener("pointerdown", e => {
-      const tc = e.pointerType === "touch";
-      setPtr(e.clientX, e.clientY, tc); P.held = true;
-      if (!tc) firePulse(e.clientX, e.clientY);
+      if (off(e)) return;
+      setPtr(e.clientX, e.clientY, e.pointerType === "touch"); P.held = true;
     }, opt);
     const rel = () => { P.held = false; P.last = performance.now(); };
     window.addEventListener("pointerup", rel, opt);
     window.addEventListener("pointercancel", rel, opt);
     // di HP, scroll membatalkan pointer event -> pakai touch event supaya tetap terasa saat digeser
     window.addEventListener("touchstart", e => {
-      const t0 = e.touches[0]; if (!t0) return;
-      setPtr(t0.clientX, t0.clientY, true); P.held = true; firePulse(P.x, P.y);
+      const t0 = e.touches[0]; if (!t0 || off(e)) return;
+      setPtr(t0.clientX, t0.clientY, true); P.held = true;
     }, opt);
     window.addEventListener("touchmove", e => {
-      const t0 = e.touches[0]; if (t0) setPtr(t0.clientX, t0.clientY, true);
+      const t0 = e.touches[0]; if (!t0 || off(e)) return;
+      setPtr(t0.clientX, t0.clientY, true);
+      flick(t0.clientX, t0.clientY);
     }, opt);
     window.addEventListener("touchend", rel, opt);
     window.addEventListener("touchcancel", rel, opt);
@@ -2703,6 +2783,191 @@ void main(){
   if (W) draw();
 })();
 
+  </script>
+
+
+  <script>
+/* ===== Black hole mini saat klik / tap: digambar di kanvas paling ATAS (di depan gambar & kartu) =====
+   Efek: (1) cincin / cakram berputar (melambat lalu makin cepat), (2) bintang berpusar masuk ke pusat,
+   (4) kilatan kecil saat semuanya terhisap.
+   TIDAK aktif di halaman pesanan (#order) dan di menu pengaturan titik 3 (.more). */
+(function () {
+  const TAU = Math.PI * 2;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // true = jangan tampilkan fitur (dipakai juga oleh script WebGL lewat window.__bhBlocked)
+  function orderOpen() {
+    const o = document.getElementById("order");
+    return !!(o && !o.classList.contains("hidden"));
+  }
+  window.__bhBlocked = function (e) {
+    if (orderOpen()) return true;
+    const el = e && e.target;
+    return !!(el && el.closest && el.closest(".more, #moreMenu, #order, input, select, textarea, label, form"));
+  };
+  if (reduce) return;
+
+  const cv = document.createElement("canvas");
+  cv.id = "bhFx";
+  cv.setAttribute("aria-hidden", "true");
+  cv.style.cssText = "position:fixed;left:0;top:0;z-index:9000;pointer-events:none;display:block;";
+  document.body.appendChild(cv);
+  const c = cv.getContext("2d");
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  // sprite cahaya kecil (dipakai ulang supaya ringan)
+  function sprite(rgb) {
+    const s = document.createElement("canvas"); s.width = s.height = 48;
+    const g = s.getContext("2d"), gr = g.createRadialGradient(24, 24, 0, 24, 24, 24);
+    gr.addColorStop(0, "rgba(" + rgb + ",1)"); gr.addColorStop(.3, "rgba(" + rgb + ",.5)"); gr.addColorStop(1, "rgba(" + rgb + ",0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 48, 48);
+    return s;
+  }
+  const SP_ORANGE = sprite("255,150,64"), SP_WHITE = sprite("232,242,255");
+
+  const D = 1450;                 // durasi efek (ms)
+  const list = [];
+  let raf = 0;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+
+  function spawn(x, y) {
+    const small = W < 700;
+    const rsMax = small ? 15 : 19;
+    const R = small ? 120 : 165;
+    const stars = [];
+    for (let i = 0; i < (small ? 44 : 60); i++) {
+      const r0 = rsMax * 1.9 + Math.pow(Math.random(), .8) * (R - rsMax * 1.9);
+      stars.push({ r0, a0: Math.random() * TAU, sz: .7 + Math.random() * 1.4, o: .45 + Math.random() * .55, warm: Math.random() < .2 });
+    }
+    const dots = [];
+    for (let i = 0; i < 28; i++) {
+      dots.push({ k: 1.6 + Math.random() * 1.2, a: Math.random() * TAU, o: .45 + Math.random() * .55, sz: 5 + Math.random() * 7 });
+    }
+    if (list.length >= 3) list.shift();
+    list.push({ x, y, t0: performance.now(), rsMax, stars, dots });
+    if (!raf) raf = requestAnimationFrame(loop);
+  }
+
+  // laju putar cincin: cepat di awal -> melambat -> makin cepat sebelum hilang. Phi = integral dari f(p)
+  const PHI = p => 1.2 * p + (7 / 8) * (1 - Math.exp(-8 * p)) + 6.5 * p * p * p * p;
+
+  function draw(f, p) {
+    const e = p < .14 ? easeOut(p / .14) : (p < .62 ? 1 : 1 - Math.pow((p - .62) / .38, 2));
+    const rs = Math.max(.5, f.rsMax * e);
+    const x = f.x, y = f.y, tilt = -.5, ct = Math.cos(tilt), st = Math.sin(tilt);
+
+    // --- bintang berpusar masuk (makin dekat pusat makin kuat memutar) ---
+    const s = Math.pow(p, 1.8);
+    const fade = clamp01(p / .1) * (1 - clamp01((p - .8) / .2));
+    c.globalCompositeOperation = "lighter";
+    c.lineCap = "round";
+    function starPos(st0, pp) {
+      const ss = Math.pow(pp, 1.8);
+      const tw = 2.4 * Math.pow(40 / st0.r0, 1.1) * (pp + 3 * pp * pp * pp);
+      const r = st0.r0 * (1 - ss) + rs * 1.15 * ss;
+      const a = st0.a0 + tw;
+      return [x + Math.cos(a) * r, y + Math.sin(a) * r];
+    }
+    for (const q of f.stars) {
+      const a1 = starPos(q, p), a0 = starPos(q, Math.max(0, p - .035));
+      c.strokeStyle = q.warm ? "rgba(255,190,130," + (.7 * q.o * fade) + ")" : "rgba(225,238,255," + (.8 * q.o * fade) + ")";
+      c.lineWidth = q.sz;
+      c.beginPath(); c.moveTo(a0[0], a0[1]); c.lineTo(a1[0], a1[1]); c.stroke();
+    }
+
+    // --- cakram: titik oranye yang mengorbit (separuh belakang digambar sebelum bayangan hitam) ---
+    const phi = PHI(p) * 1.4;
+    function dotsPass(front) {
+      for (const d of f.dots) {
+        const rr = d.k * rs;
+        const ph = d.a + Math.pow(1.7 / d.k, 1.5) * phi;
+        const lx = Math.cos(ph) * rr, ly = Math.sin(ph) * rr * .34;
+        if ((Math.sin(ph) > 0) !== front) continue;
+        const X = x + lx * ct - ly * st, Y = y + lx * st + ly * ct;
+        const warm = d.k > 2.2 || Math.cos(ph) < 0;
+        const al = clamp01(e * 1.3) * d.o * (front ? 1 : .55);
+        const sz = d.sz * (.6 + .4 * e);
+        c.globalAlpha = al;
+        c.drawImage(warm ? SP_ORANGE : SP_WHITE, X - sz, Y - sz, sz * 2, sz * 2);
+      }
+      c.globalAlpha = 1;
+    }
+    function diskEdge(front) {
+      c.lineWidth = 1.2;
+      for (const k of [1.7, 2.7]) {
+        c.strokeStyle = "rgba(255,170,100," + (.22 * e) + ")";
+        c.beginPath();
+        c.ellipse(x, y, k * rs, k * rs * .34, tilt, front ? 0 : Math.PI, front ? Math.PI : TAU);
+        c.stroke();
+      }
+    }
+    diskEdge(false); dotsPass(false);
+
+    // --- bayangan hitam (menutupi gambar di bawahnya) ---
+    c.globalCompositeOperation = "source-over";
+    const g = c.createRadialGradient(x, y, rs * .8, x, y, rs * 1.18);
+    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(.72, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = g;
+    c.beginPath(); c.arc(x, y, rs * 1.18, 0, TAU); c.fill();
+
+    // --- cincin foton oranye -> putih ---
+    c.globalCompositeOperation = "lighter";
+    const R1 = rs * 1.45;
+    const lg = c.createLinearGradient(x - R1 * .7, y - R1 * .7, x + R1 * .7, y + R1 * .7);
+    lg.addColorStop(0, "rgba(240,247,255," + (.95 * e) + ")");
+    lg.addColorStop(1, "rgba(255,140,60," + (.8 * e) + ")");
+    c.strokeStyle = lg; c.lineWidth = Math.max(1, rs * .16);
+    c.beginPath(); c.arc(x, y, R1, 0, TAU); c.stroke();
+    c.strokeStyle = "rgba(255,160,90," + (.18 * e) + ")"; c.lineWidth = rs * .5;
+    c.beginPath(); c.arc(x, y, R1, 0, TAU); c.stroke();
+
+    diskEdge(true); dotsPass(true);
+
+    // --- penutup: kilatan kecil saat semuanya terhisap ---
+    if (p > .86) {
+      const fl = Math.sin(clamp01((p - .86) / .14) * Math.PI);
+      const fr = 10 + 34 * fl;
+      const fg = c.createRadialGradient(x, y, 0, x, y, fr);
+      fg.addColorStop(0, "rgba(255,255,255," + (.95 * fl) + ")");
+      fg.addColorStop(.4, "rgba(255,190,120," + (.5 * fl) + ")");
+      fg.addColorStop(1, "rgba(255,150,70,0)");
+      c.fillStyle = fg;
+      c.beginPath(); c.arc(x, y, fr, 0, TAU); c.fill();
+    }
+    c.globalCompositeOperation = "source-over";
+  }
+
+  function loop(now) {
+    if (orderOpen()) list.length = 0;     // masuk ke halaman pesanan -> efek langsung dihentikan
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, H);
+    for (let i = 0; i < list.length; i++) {
+      const p = (now - list[i].t0) / D;
+      if (p >= 1) { list.splice(i--, 1); continue; }
+      draw(list[i], p);
+    }
+    raf = list.length ? requestAnimationFrame(loop) : 0;
+  }
+
+  // klik / tap (capture, supaya tetap jalan walau elemen lain memanggil stopPropagation)
+  window.addEventListener("click", e => {
+    if (window.__bhBlocked(e)) return;
+    let x = e.clientX, y = e.clientY;
+    if (!e.detail && e.target && e.target.getBoundingClientRect) {   // aktivasi via keyboard -> pakai tengah elemen
+      const r = e.target.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2;
+    }
+    spawn(x, y);
+  }, true);
+})();
   </script>
 
   <script>
